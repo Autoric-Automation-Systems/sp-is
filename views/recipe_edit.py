@@ -1,11 +1,12 @@
 import tkinter as tk
-from components.layout import BaseLayout
-from services.recipe_service import save_recipe
-from picamera2 import Picamera2
+from tkinter import messagebox
 import cv2
 from PIL import Image, ImageTk
-import os
-from tkinter import messagebox
+
+from components.layout import BaseLayout
+from components.camera_view import CameraView
+from components.roi_selector import ROISelector
+from services.recipe_service import save_recipe
 
 
 class RecipeEditView:
@@ -14,12 +15,14 @@ class RecipeEditView:
         self.recipe = recipe
 
         layout = BaseLayout(parent, app)
+        self.frame = layout.frame
 
         tk.Label(layout.content, text="EDIÇÃO DE RECEITA", font=("Arial", 18)).pack(pady=10)
 
         # Nome
         self.name = tk.Entry(layout.content)
-        self.name.pack()
+        self.name.pack(pady=5)
+
         if recipe:
             self.name.insert(0, recipe["name"])
 
@@ -27,31 +30,31 @@ class RecipeEditView:
         self.canvas = tk.Canvas(layout.content, width=640, height=480, bg="black")
         self.canvas.pack()
 
+        # Camera
+        self.camera = CameraView()
+
         # ROI
-        self.start_x = None
-        self.start_y = None
-        self.rect = None
-        self.roi = None
+        self.roi_selector = ROISelector(self.canvas)
 
-        self.canvas.bind("<ButtonPress-1>", self.on_click)
-        self.canvas.bind("<B1-Motion>", self.on_drag)
-        self.canvas.bind("<ButtonRelease-1>", self.on_release)
-
+        if recipe:
+            self.roi_selector.set_original(recipe["roi"])
         # Botões
         btns = tk.Frame(layout.content)
         btns.pack(pady=10)
+
         tk.Button(btns, text="Salvar", command=self.save).pack(side="left", padx=5)
         tk.Button(btns, text="Cancelar", command=self.cancel).pack(side="left", padx=5)
 
-        # Camera
-        self.picam2 = Picamera2()
-        self.picam2.start()
-
+        # Loop
+        self.running = True
         self.update_frame()
 
     # -------- CAMERA LOOP --------
     def update_frame(self):
-        frame = self.picam2.capture_array()
+        if not self.running:
+            return
+
+        frame = self.camera.get_frame()
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         self.current_frame = frame.copy()
@@ -62,39 +65,12 @@ class RecipeEditView:
         self.canvas.imgtk = imgtk
         self.canvas.create_image(0, 0, anchor="nw", image=imgtk)
 
+        # desenha ROI
+        self.roi_selector.draw()
+
         self.canvas.after(30, self.update_frame)
 
-    # -------- ROI EVENTS --------
-    def on_click(self, event):
-        self.start_x = event.x
-        self.start_y = event.y
-
-        if self.rect:
-            self.canvas.delete(self.rect)
-
-    def on_drag(self, event):
-        if self.rect:
-            self.canvas.delete(self.rect)
-
-        self.rect = self.canvas.create_rectangle(
-            self.start_x,
-            self.start_y,
-            event.x,
-            event.y,
-            outline="red",
-            width=2
-        )
-
-    def on_release(self, event):
-        self.roi = {
-            "x1": self.start_x,
-            "y1": self.start_y,
-            "x2": event.x,
-            "y2": event.y
-        }
-
-        print("ROI:", self.roi)
-
+    # -------- SAVE --------
     def save(self):
         name = self.name.get().strip()
 
@@ -102,23 +78,33 @@ class RecipeEditView:
             messagebox.showerror("Erro", "Nome obrigatório")
             return
 
-        if not self.roi:
+        roi = self.roi_selector.get_final_roi()
+        if not roi:
             messagebox.showerror("Erro", "Selecione ROI")
             return
 
-        success, error = save_recipe(name, self.roi, self.current_frame)
+        original_name = self.recipe["name"] if self.recipe else None
+
+        success, error = save_recipe(
+            name,
+            roi,
+            self.current_frame,
+            original_name
+        )
 
         if not success:
             messagebox.showerror("Erro", error)
             return
 
-        self.picam2.stop()
+        self.cleanup()
         self.app.show_recipes()
 
+    # -------- CANCEL --------
     def cancel(self):
-        try:
-            self.picam2.stop()
-        except:
-            pass
-
+        self.cleanup()
         self.app.show_recipes()
+
+    # -------- CLEANUP --------
+    def cleanup(self):
+        self.running = False
+        self.camera.stop()

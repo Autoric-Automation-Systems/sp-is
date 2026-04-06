@@ -12,7 +12,7 @@ def ensure_dirs():
     os.makedirs(IMAGE_PATH, exist_ok=True)
 
 
-def save_recipe(name, roi, frame):
+def save_recipe(name, roi, frame, original_name=None):    
     ensure_dirs()
 
     filename = name.replace(" ", "_").lower()
@@ -23,9 +23,21 @@ def save_recipe(name, roi, frame):
     json_path = os.path.join(BASE_PATH, json_file)
     image_path = os.path.join(IMAGE_PATH, image_file)
 
-    # 🚫 valida duplicado
     if os.path.exists(json_path):
-        return False, "Já existe uma receita com esse nome"
+        if not original_name or original_name != name:
+            return False, "Já existe uma receita com esse nome"
+
+    if original_name and original_name != name:
+        old_filename = original_name.replace(" ", "_").lower()
+
+        old_json = os.path.join(BASE_PATH, f"{old_filename}.json")
+        old_image = os.path.join(IMAGE_PATH, f"{old_filename}.jpg")
+
+        if os.path.exists(old_json):
+            os.remove(old_json)
+
+        if os.path.exists(old_image):
+            os.remove(old_image)
 
     # salva imagem
     cv2.imwrite(image_path, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
