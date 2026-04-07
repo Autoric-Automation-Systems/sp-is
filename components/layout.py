@@ -1,18 +1,21 @@
 import tkinter as tk
 from components.header import Header
 from components.footer import Footer
+from styles.theme import *
 
 class BaseLayout:
     def __init__(self, parent, app):
-        self.frame = tk.Frame(parent)
+        # FRAME ROOT
+        self.frame = tk.Frame(parent, bg=BG)
         self.frame.pack(fill="both", expand=True)
+        self.frame.pack_propagate(False)
 
-        # HEADER (topo)
-        self.header = Header(self.frame, app)
+        # HEADER
+        Header(self.frame, app)
 
-        # FOOTER (embaixo)
-        self.footer = Footer(self.frame, app)
+        # CONTENT (área central, estilizada)
+        self.content = tk.Frame(self.frame, bg=BG)
+        self.content.pack(fill="both", expand=True, padx=0, pady=0)
 
-        # CONTENT (meio - SEMPRE depois dos dois)
-        self.content = tk.Frame(self.frame)
-        self.content.pack(fill="both", expand=True)
+        # FOOTER
+        Footer(self.frame, app)

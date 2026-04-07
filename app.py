@@ -1,16 +1,14 @@
 import tkinter as tk
-
 from views.login import LoginView
 from views.production import ProductionView
 from views.users import UsersView
 from views.recipes import RecipesView
 from views.diagnosis import DiagnosisView
 
-
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-
+        self.configure(bg="#1e1e1e")
         self.title("SP-IS")
         self.update_idletasks()
         self.attributes("-zoomed", True)   
