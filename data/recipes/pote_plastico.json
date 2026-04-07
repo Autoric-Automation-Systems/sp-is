@@ -1,0 +1,12 @@
+{
+  "name": "Pote Plastico",
+  "image": "data/images/pote_plastico.jpg",
+  "roi": {
+    "x1": 315,
+    "y1": 132,
+    "x2": 399,
+    "y2": 173
+  },
+  "created_at": "2026-04-07 19:44:02",
+  "updated_at": "2026-04-07 19:44:02"
+}

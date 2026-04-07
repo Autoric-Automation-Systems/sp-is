@@ -6,7 +6,7 @@ class Menu:
         self.app = app
 
         self.window = tk.Toplevel(parent)
-        self.window.title("Menu")
+        #self.window.title("Menu")
         self.window.configure(bg=HEADER_BG)
 
         screen_height = self.window.winfo_screenheight()
@@ -43,10 +43,15 @@ class Menu:
         tk.Button(self.window, text="Usuários",
                   command=lambda: self.go("users"), **btn_opts).pack(fill="x", pady=2)
         tk.Button(self.window, text="Diagnóstico",
-                  command=lambda: self.go("diagnosis"), **btn_opts).pack(fill="x", pady=2)
+              command=lambda: self.go("diagnosis"), **btn_opts).pack(fill="x", pady=2)
+        tk.Button(self.window, text="Configurações",
+              command=lambda: self.go("config"), **btn_opts).pack(fill="x", pady=(16, 2))
+        logout_opts = btn_opts.copy()
+        logout_opts["bg"] = DANGER
+        logout_opts["activebackground"] = DANGER_HOVER
         tk.Button(self.window, text="Logout",
-                  command=lambda: self.go("logout"),
-                  bg=DANGER, activebackground=DANGER_HOVER, **btn_opts).pack(fill="x", pady=(16, 0))
+              command=lambda: self.go("logout"),
+              **logout_opts).pack(fill="x", pady=(16, 0))
 
     def go(self, target):
         self.window.destroy()
@@ -59,6 +64,11 @@ class Menu:
             self.app.show_recipes()
         elif target == "diagnosis":
             self.app.show_diagnosis()
+        elif target == "config":
+            from views.config import ConfigView
+            # Usa o root principal para evitar erro de janela destruída
+            root = self.window.master if hasattr(self.window, 'master') else self.window
+            ConfigView(root, self.app)
         elif target == "logout":
             self.app.current_user = None
             self.app.show_login()

@@ -25,6 +25,8 @@ class App(tk.Tk):
 
     def clear(self):
         for widget in self.container.winfo_children():
+            if hasattr(widget, "cleanup"):
+                widget.cleanup()
             widget.destroy()
 
     def show_login(self):

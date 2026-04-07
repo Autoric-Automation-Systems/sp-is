@@ -7,12 +7,11 @@ class Card:
             parent,
             bg=CARD,
             width=width,
-            highlightthickness=1,
-            highlightbackground=BORDER
+            highlightthickness=2,
+            highlightbackground=BORDER,
+            bd=0
         )
-
-        self.frame.place(relx=0.5, rely=0.5, anchor="center")
-        self.frame.pack_propagate(True)  # Permite crescer conforme o conteúdo
-
+        self.frame.pack(fill="both", expand=True, pady=32)
+        self.frame.pack_propagate(False)
         self.content = tk.Frame(self.frame, bg=CARD)
-        self.content.pack(fill="both", expand=True, padx=20, pady=20)
+        self.content.pack(fill="both", expand=True, padx=32, pady=32)

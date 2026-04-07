@@ -1,0 +1,12 @@
+{
+  "name": "Pote vidro",
+  "image": "data/images/pote_vidro.jpg",
+  "roi": {
+    "x1": 266,
+    "y1": 307,
+    "x2": 422,
+    "y2": 337
+  },
+  "created_at": "2026-04-07 20:19:57",
+  "updated_at": "2026-04-07 20:19:57"
+}

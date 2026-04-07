@@ -42,11 +42,18 @@ def save_recipe(name, roi, frame, original_name=None):
     # salva imagem
     cv2.imwrite(image_path, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
 
+
+    # Corrige ROI se necessário
+    x1, y1, x2, y2 = roi["x1"], roi["y1"], roi["x2"], roi["y2"]
+    x1, x2 = min(x1, x2), max(x1, x2)
+    y1, y2 = min(y1, y2), max(y1, y2)
+    roi = {"x1": x1, "y1": y1, "x2": x2, "y2": y2}
+
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     data = {
         "name": name,
-        "image": image_file,
+        "image": image_path,  # salva caminho completo relativo
         "roi": roi,
         "created_at": now,
         "updated_at": now
@@ -76,7 +83,8 @@ def delete_recipe(recipe):
     filename = recipe["name"].replace(" ", "_").lower()
 
     json_path = os.path.join(BASE_PATH, f"{filename}.json")
-    image_path = os.path.join(IMAGE_PATH, recipe["image"])
+    # Usa o caminho salvo no campo 'image' (já relativo à raiz do projeto)
+    image_path = recipe["image"]
 
     if os.path.exists(json_path):
         os.remove(json_path)

@@ -16,6 +16,8 @@ class ROISelector:
         self.dragging = False
         self.resizing = False
         self.active_handle = None
+        self.offset_x = 0
+        self.offset_y = 0
 
         canvas.bind("<ButtonPress-1>", self.on_click)
         canvas.bind("<B1-Motion>", self.on_drag)
