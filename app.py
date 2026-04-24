@@ -3,7 +3,7 @@ from views.login import LoginView
 from views.production import ProductionView
 from views.users import UsersView
 from views.recipes import RecipesView
-from views.diagnosis import DiagnosisView
+from views.diagnosis_view import DiagnosisView
 
 class App(tk.Tk):
     def __init__(self):
