@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.venv/
+.runtime/
+*.log
+.DS_Store
+data/sp_is.db
+data/sp_is.db-wal
+data/sp_is.db-shm

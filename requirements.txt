@@ -1,0 +1,13 @@
+# Dependências de execução.
+# No Raspberry Pi prefira os pacotes do sistema:
+#   sudo apt install python3-picamera2 python3-opencv python3-pil python3-psutil
+numpy>=1.24
+customtkinter>=5.2
+opencv-python-headless>=4.8
+Pillow>=10.0
+psutil>=5.9
+
+# Apenas desenvolvimento (recarga automática via dev.py)
+watchdog>=3.0
+
+# picamera2 é exclusivo do Raspberry Pi e não é instalado por pip.

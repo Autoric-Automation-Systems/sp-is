@@ -55,3 +55,23 @@ FONT_BOLD = ("Segoe UI", 11, "bold")
 FONT_SMALL = ("Segoe UI", 9)
 FONT_TITLE = ("Segoe UI", 18, "bold") # Aumentei um pouco para dar mais peso
 FONT_HEADER = ("Segoe UI", 14, "bold")
+# -------- LAYOUT --------
+SIDEBAR_BG = "#0d1118"
+SIDEBAR_WIDTH = 220
+CONTENT_PAD = 24
+
+# -------- ESTADOS --------
+SUCCESS_HOVER = "#0d9668"
+WARNING_HOVER = "#d9a21b"
+PRIMARY_CONTRAST = "#04121c"   # texto sobre PRIMARY
+SUCCESS_CONTRAST = "#04140e"
+
+# -------- DIMENSÕES --------
+SPACING_XS = 4
+SPACING_SM = 8
+SPACING_MD = 16
+SPACING_LG = 24
+SPACING_XL = 32
+
+FONT_VALUE = ("Segoe UI", 22, "bold")
+FONT_STAT = ("Segoe UI", 16, "bold")

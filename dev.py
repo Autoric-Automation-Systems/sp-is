@@ -1,7 +1,13 @@
+"""Recarrega o aplicativo quando um arquivo .py é alterado (desenvolvimento)."""
+import logging
 import subprocess
+import sys
 import time
-from watchdog.observers import Observer
+
 from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
+
+LOGGER = logging.getLogger(__name__)
 
 
 class RestartHandler(FileSystemEventHandler):
@@ -10,18 +16,30 @@ class RestartHandler(FileSystemEventHandler):
         self.start()
 
     def start(self):
-        if self.process:
-            self.process.kill()
+        self.stop()
+        LOGGER.info("Iniciando app...")
+        self.process = subprocess.Popen([sys.executable, "app.py"])
 
-        print("🔁 Reiniciando app...")
-        self.process = subprocess.Popen(["python", "app.py"])
+    def stop(self):
+        if self.process and self.process.poll() is None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+        self.process = None
 
     def on_modified(self, event):
-        if event.src_path.endswith(".py"):
-            self.start()
+        if event.is_directory or not event.src_path.endswith(".py"):
+            return
+        if "__pycache__" in event.src_path:
+            return
+        LOGGER.info("Alteração detectada em %s", event.src_path)
+        self.start()
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     event_handler = RestartHandler()
     observer = Observer()
     observer.schedule(event_handler, ".", recursive=True)
@@ -32,5 +50,6 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         observer.stop()
-
-    observer.join()
+    finally:
+        event_handler.stop()
+        observer.join()

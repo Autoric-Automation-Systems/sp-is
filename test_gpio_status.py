@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 """Test script to check GPIO status display"""
-import sys
-sys.path.insert(0, '/home/admin/sp-is')
-
 from processes.gpio_checker import GpioChecker
 
 print("=== Testando GPIO Status ===\n")
