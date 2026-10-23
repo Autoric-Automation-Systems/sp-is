@@ -2,6 +2,7 @@
 import tkinter as tk
 import psutil
 import platform
+from components import ui
 from styles.theme import *
 from processes.monitor import SystemMonitor
 from .base_tab import BaseTab
@@ -29,7 +30,7 @@ class CpuTab(BaseTab):
         percpu = SystemMonitor.cpu_percent_per_core()
         cols = 4
         for i, p in enumerate(percpu):
-            row_f = tk.Frame(percpu_frame, bg=CARD)
+            row_f = ui.frame(percpu_frame, "card")
             row_f.grid(row=i // cols, column=i % cols, sticky="w", padx=8, pady=4)
             tk.Label(row_f, text=f"Núcleo {i}:", font=FONT_BOLD, fg=TEXT_DIM, bg=CARD).pack(side="left")
             val = tk.Label(row_f, text=f"{p:.1f}%", font=FONT, fg=TEXT, bg=CARD)
@@ -39,7 +40,7 @@ class CpuTab(BaseTab):
     def update(self):
         pct = SystemMonitor.cpu_percent()
         color = SUCCESS if pct < 50 else (WARNING if pct < 80 else DANGER)
-        self.cpu_lbl.config(text=f"{pct:.1f}%", fg=color)
+        self.cpu_lbl.configure(text=f"{pct:.1f}%", text_color=color)
         w = self.cpu_canvas.winfo_width()
         self.cpu_canvas.coords(self.cpu_fill, 0, 0, w * pct / 100, 20)
         self.cpu_canvas.itemconfig(self.cpu_fill, fill=color)
@@ -47,4 +48,4 @@ class CpuTab(BaseTab):
         percpu = SystemMonitor.cpu_percent_per_core()
         for i, val in enumerate(self.percpu_labels):
             if i < len(percpu):
-                val.config(text=f"{percpu[i]:.1f}%")
+                val.configure(text=f"{percpu[i]:.1f}%")

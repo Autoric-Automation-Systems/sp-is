@@ -1,66 +1,87 @@
-"""Classe base para as abas de diagnóstico"""
-import tkinter as tk
+"""Classe base para as abas de diagnóstico."""
+import time
+
+import customtkinter as ctk
+
+from components import ui
 from styles.theme import *
 
 
 class BaseTab:
-    """Fornece helpers para construção de abas"""
+    """Fornece helpers para construção de abas."""
 
     def __init__(self, parent):
         self.parent = parent
-        self.container = tk.Frame(parent, bg=CARD)
-        self.container.pack(fill="both", expand=True, padx=24, pady=24)
+        self._cache = {}
+        self.container = ctk.CTkFrame(parent, fg_color=CARD, corner_radius=0)
+        self.container.pack(fill="both", expand=True, padx=18, pady=16)
 
-    def _make_label_frame(self, parent, titulo, **kwargs):
-        """Cria um LabelFrame padronizado"""
-        fg = kwargs.pop("fg", PRIMARY)
-        frame = tk.LabelFrame(
+    def _cached(self, key, ttl, factory):
+        """Evita repetir chamadas caras (subprocessos) em cada atualização."""
+        now = time.monotonic()
+        cached = self._cache.get(key)
+        if cached is not None and now - cached[0] < ttl:
+            return cached[1]
+        value = factory()
+        self._cache[key] = (now, value)
+        return value
+
+    def _section(self, parent, titulo, fg=PRIMARY, **kwargs):
+        """Cartão com título; retorna o frame de conteúdo."""
+        kwargs.pop("pack", None)
+        card = ctk.CTkFrame(
             parent,
-            text=titulo,
-            font=FONT_HEADER,
-            fg=fg,
-            bg=CARD,
-            bd=0,
-            padx=16,
-            pady=12,
+            fg_color=CARD,
+            corner_radius=8,
+            border_width=1,
+            border_color=BORDER,
         )
-        if "pack" not in kwargs:
-            frame.pack(fill="x", pady=(0, 16))
-        return frame
+        card.pack(fill="x", pady=(0, 10))
+
+        ui.label(card, titulo, kind="bold", fg=fg, bg=CARD).pack(
+            anchor="w", padx=12, pady=(10, 4)
+        )
+        content = ctk.CTkFrame(card, fg_color=CARD, corner_radius=0)
+        content.pack(fill="both", expand=True, padx=12, pady=(0, 10))
+        return content
+
+    # Compatibilidade com as abas existentes.
+    _make_label_frame = _section
 
     def _make_info_table(self, parent, data, **kwargs):
-        """Cria tabela label: valor"""
+        """Cria tabela label: valor."""
         start_row = kwargs.pop("start_row", 0)
-        for i, (label, value) in enumerate(data):
-            tk.Label(
-                parent, text=f"{label}:", font=FONT_BOLD, fg=TEXT_DIM, bg=CARD
-            ).grid(row=start_row + i, column=0, sticky="w", pady=3)
-            tk.Label(
-                parent, text=value, font=FONT, fg=TEXT, bg=CARD
-            ).grid(row=start_row + i, column=1, sticky="w", padx=(12, 0), pady=3)
+        for i, (label_text, value) in enumerate(data):
+            ui.label(parent, f"{label_text}:", kind="small", bg=CARD).grid(
+                row=start_row + i, column=0, sticky="w", pady=2
+            )
+            ui.label(parent, value, kind="body", bg=CARD).grid(
+                row=start_row + i, column=1, sticky="w", padx=(12, 0), pady=2
+            )
 
     def _make_bar(self, parent, **kwargs):
-        """Cria uma barra de progresso via Canvas"""
-        height = kwargs.pop("height", 20)
+        """Cria uma barra de progresso via Canvas."""
+        height = kwargs.pop("height", 18)
         bg_color = kwargs.pop("bg_color", INPUT_BG)
         fill_color = kwargs.pop("fill_color", SUCCESS)
-        canvas = tk.Canvas(
-            parent,
-            height=height,
-            bg=bg_color,
-            highlightthickness=1,
-            highlightbackground=BORDER,
-            bd=0,
-        )
-        canvas.pack(fill="x", pady=(0, 8))
+        holder = ctk.CTkFrame(parent, fg_color=CARD, corner_radius=0)
+        holder.pack(fill="x", pady=(0, 8))
+        canvas = ui.canvas(holder, width=200, height=height, bg=bg_color)
+        canvas.configure(height=height, highlightthickness=1,
+                         highlightbackground=BORDER)
+        canvas.pack(fill="x")
         fill_rect = canvas.create_rectangle(0, 0, 0, height, fill=fill_color, width=0)
         return canvas, fill_rect
 
     def _make_header_text(self, parent, text, font_size=32, **kwargs):
-        """Label grande para percentual"""
+        """Label grande para percentual."""
         fg = kwargs.pop("fg", SUCCESS)
-        lbl = tk.Label(
-            parent, text=text, font=("Segoe UI", font_size, "bold"), fg=fg, bg=CARD
+        lbl = ctk.CTkLabel(
+            parent,
+            text=text,
+            font=ui.font("Segoe UI", int(font_size * 0.7), "bold"),
+            text_color=fg,
+            fg_color=CARD,
         )
-        lbl.pack(pady=10)
+        lbl.pack(pady=8)
         return lbl

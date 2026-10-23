@@ -44,5 +44,5 @@ class NetworkTab(BaseTab):
     def update(self):
         net = SystemMonitor.net_io()
         fmt = SystemMonitor.format_bytes
-        self.sent_lbl.config(text=f"Enviado: {fmt(net.bytes_sent)}")
-        self.recv_lbl.config(text=f"Recebido: {fmt(net.bytes_recv)}")
+        self.sent_lbl.configure(text=f"Enviado: {fmt(net.bytes_sent)}")
+        self.recv_lbl.configure(text=f"Recebido: {fmt(net.bytes_recv)}")

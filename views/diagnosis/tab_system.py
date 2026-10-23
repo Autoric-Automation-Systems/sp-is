@@ -1,5 +1,6 @@
 """Aba Sistema - SO, sensores, portas fisicas, camera, processos"""
 import tkinter as tk
+from components import ui
 from styles.theme import *
 from processes.monitor import SystemMonitor
 from processes.gpio_checker import GpioChecker
@@ -12,17 +13,11 @@ class SystemTab(BaseTab):
         super().__init__(parent)
 
         # Scroll
-        canvas = tk.Canvas(self.container, bg=CARD, highlightthickness=0)
-        scrollbar = tk.Scrollbar(self.container, orient="vertical", command=canvas.yview)
-        scroll_frame = tk.Frame(canvas, bg=CARD)
-        scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        canvas, scroll_frame = ui.scrollable(self.container, bg=CARD)
+        canvas.pack(fill="both", expand=True)
 
         # Coluna esquerda
-        left = tk.Frame(scroll_frame, bg=CARD)
+        left = ui.frame(scroll_frame, "card")
         left.pack(side="left", fill="both", expand=True, padx=(0, 8))
 
         sof = self._make_label_frame(left, "Sistema Operacional", pack=False)
@@ -50,7 +45,7 @@ class SystemTab(BaseTab):
         pf.pack(fill="x", pady=(0, 8))
         self.portas_labels = {}
         for nome in ["USB", "HDMI", "Ethernet"]:
-            f = tk.Frame(pf, bg=CARD)
+            f = ui.frame(pf, "card")
             f.pack(fill="x", pady=2)
             tk.Label(f, text=nome, font=FONT_BOLD, fg=TEXT_DIM, bg=CARD, width=14, anchor="w").pack(side="left")
             lbl = tk.Label(f, text="---", font=FONT, fg=TEXT, bg=CARD)
@@ -61,7 +56,7 @@ class SystemTab(BaseTab):
         cf.pack(fill="x", pady=(0, 8))
         self.cam_labels = {}
         for m in ["libcamera", "raspistill", "opencv"]:
-            f = tk.Frame(cf, bg=CARD)
+            f = ui.frame(cf, "card")
             f.pack(fill="x", pady=1)
             tk.Label(f, text=m, font=FONT_BOLD, fg=TEXT_DIM, bg=CARD, width=14, anchor="w").pack(side="left")
             lbl = tk.Label(f, text="---", font=FONT, fg=TEXT, bg=CARD)
@@ -69,13 +64,13 @@ class SystemTab(BaseTab):
             self.cam_labels[m] = lbl
 
         # Coluna direita
-        right = tk.Frame(scroll_frame, bg=CARD)
+        right = ui.frame(scroll_frame, "card")
         right.pack(side="right", fill="both", expand=True, padx=(8, 0))
 
         pcf = self._make_label_frame(right, "Processos (Top 10 CPU)", pack=False)
         pcf.pack(fill="both", expand=True)
 
-        cols = tk.Frame(pcf, bg=CARD)
+        cols = ui.frame(pcf, "card")
         cols.pack(fill="x", pady=4)
         for j, (txt, w) in enumerate([("PID", 8), ("Nome", 20), ("CPU%", 8), ("Mem%", 8)]):
             tk.Label(cols, text=txt, font=FONT_BOLD, fg=TEXT_DIM, bg=CARD, width=w, anchor="w").grid(row=0, column=j, padx=2, pady=2)
@@ -96,25 +91,25 @@ class SystemTab(BaseTab):
         temp = GpioChecker.temperatura_cpu()
         if temp is not None:
             cor = SUCCESS if temp < 60 else (WARNING if temp < 75 else DANGER)
-            self.temp_lbl.config(text=f"Temperatura CPU: {temp:.1f} C", fg=cor)
+            self.temp_lbl.configure(text=f"Temperatura CPU: {temp:.1f} C", fg=cor)
         freq = GpioChecker.frequencia_cpu()
         if freq is not None:
-            self.freq_lbl.config(text=f"Frequencia CPU: {freq:.0f} MHz")
+            self.freq_lbl.configure(text=f"Frequencia CPU: {freq:.0f} MHz")
         volt = GpioChecker.voltagem_cpu()
         if volt:
-            self.volt_lbl.config(text=f"Voltagem Core: {volt}")
+            self.volt_lbl.configure(text=f"Voltagem Core: {volt}")
         throttle = GpioChecker.throttled_status()
         if throttle:
-            self.throttle_lbl.config(text=f"Throttling: {throttle}")
+            self.throttle_lbl.configure(text=f"Throttling: {throttle}")
 
-        usb = GpioChecker.usb_ports()
-        self.portas_labels["USB"].config(text=f"{usb} dispositivo(s)", fg=SUCCESS if usb else TEXT_DIM)
-        hok, hmsg = GpioChecker.hdmi_status()
-        self.portas_labels["HDMI"].config(text=hmsg, fg=SUCCESS if hok else TEXT_DIM)
-        eok, emsg = GpioChecker.ethernet_status()
-        self.portas_labels["Ethernet"].config(text=emsg, fg=SUCCESS if eok else TEXT_DIM)
+        usb = self._cached("usb", 10, GpioChecker.usb_ports)
+        self.portas_labels["USB"].configure(text=f"{usb} dispositivo(s)", fg=SUCCESS if usb else TEXT_DIM)
+        hok, hmsg = self._cached("hdmi", 10, GpioChecker.hdmi_status)
+        self.portas_labels["HDMI"].configure(text=hmsg, fg=SUCCESS if hok else TEXT_DIM)
+        eok, emsg = self._cached("ethernet", 10, GpioChecker.ethernet_status)
+        self.portas_labels["Ethernet"].configure(text=emsg, fg=SUCCESS if eok else TEXT_DIM)
 
-        cam = CameraChecker.check()
+        cam = self._cached("camera", 15, CameraChecker.check)
         for m, lbl in self.cam_labels.items():
             s = cam.get(m, "?")
             if "Dispon" in str(s) or "OK" in str(s):
@@ -123,21 +118,21 @@ class SystemTab(BaseTab):
                 cor = TEXT_DISABLED
             else:
                 cor = TEXT_DIM
-            lbl.config(text=str(s), fg=cor)
+            lbl.configure(text=str(s), fg=cor)
 
         try:
             procs = SystemMonitor.top_processes(10)
             for i, (pid_lbl, name_lbl, cpu_lbl, mem_lbl) in enumerate(self.proc_labels):
                 if i < len(procs):
                     p = procs[i]
-                    pid_lbl.config(text=str(p["pid"]))
-                    name_lbl.config(text=(p["name"] or "-")[:18])
-                    cpu_lbl.config(text=f"{(p.get('cpu_percent') or 0):.1f}%")
-                    mem_lbl.config(text=f"{(p.get('memory_percent') or 0):.1f}%")
+                    pid_lbl.configure(text=str(p["pid"]))
+                    name_lbl.configure(text=(p["name"] or "-")[:18])
+                    cpu_lbl.configure(text=f"{(p.get('cpu_percent') or 0):.1f}%")
+                    mem_lbl.configure(text=f"{(p.get('memory_percent') or 0):.1f}%")
                 else:
-                    pid_lbl.config(text="-")
-                    name_lbl.config(text="-")
-                    cpu_lbl.config(text="-")
-                    mem_lbl.config(text="-")
+                    pid_lbl.configure(text="-")
+                    name_lbl.configure(text="-")
+                    cpu_lbl.configure(text="-")
+                    mem_lbl.configure(text="-")
         except:
             pass

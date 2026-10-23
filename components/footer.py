@@ -1,65 +1,55 @@
-import tkinter as tk
+import logging
 import time
-from components.menu import Menu
+
+import customtkinter as ctk
+from PIL import Image
+
+from components import ui
+from paths import ASSETS_DIR
 from styles.theme import *
 
+LOGGER = logging.getLogger(__name__)
+
 BG = FOOTER_BG
-BTN_BG = BUTTON_BG
-BTN_HOVER = BUTTON_HOVER
-BTN_TEXT = BUTTON_TEXT
+LOGO_PATH = ASSETS_DIR / "logo-dev.png"
+
 
 class Footer:
+    """Footer persistente com logo dev, nome do sistema, usuário e relógio."""
+
     def __init__(self, parent, app):
         self.app = app
+        self._after_id = None
 
-        self.frame = tk.Frame(
-            parent,
-            height=40,
-            bg=BG,
-            relief="flat",
-            bd=0,
-            highlightthickness=0,
-            padx=10,
-            pady=5
-        )
-        self.frame.pack(fill="x", side="bottom")
+        self.frame = ctk.CTkFrame(parent, fg_color=BG, corner_radius=0, height=46)
         self.frame.pack_propagate(False)
 
-        # BOTÃO MENU
-        tk.Button(
-            self.frame,
-            text="☰ MENU",
-            command=self.open_menu,
-            font=BUTTON_FONT,
-            bg=BTN_BG,
-            fg=BTN_TEXT,
-            relief="flat",
-            bd=0,
-            padx=12,
-            pady=5,
-            activebackground=BTN_HOVER,
-            activeforeground=BTN_TEXT,
-            cursor="hand2",
-            highlightthickness=0
-        ).pack(side="left", padx=10)
+        try:
+            image = Image.open(LOGO_PATH)
+            self.logo = ctk.CTkImage(light_image=image, dark_image=image, size=(96, 26))
+            ctk.CTkLabel(self.frame, image=self.logo, text="", fg_color=BG).pack(
+                side="left", padx=(14, 10), pady=6
+            )
+        except Exception as exc:
+            LOGGER.warning("Erro ao carregar logo dev: %s", exc)
 
-        # INFO DIREITA
-        self.info = tk.Label(
-            self.frame,
-            fg=BTN_TEXT,
-            bg=BG,
-            font=FONT_SMALL,
-            anchor="e"
+        ui.label(self.frame, "SP-IS · Inspeção Visual", kind="small", bg=BG).pack(
+            side="left"
         )
-        self.info.pack(side="right", padx=10)
+
+        self.info = ui.label(self.frame, "", kind="small", bg=BG)
+        self.info.pack(side="right", padx=14)
+
+        ctk.CTkFrame(self.frame, fg_color=BORDER, height=1, corner_radius=0).pack(
+            fill="x", side="top"
+        )
 
         self.update_time()
 
     def update_time(self):
+        if not self.frame.winfo_exists():
+            return
         now = time.strftime("%H:%M:%S")
-        user = self.app.current_user or "-"
-        self.info.config(text=f"{user} | {now}")
-        self.frame.after(1000, self.update_time)
-
-    def open_menu(self):
-        Menu(self.frame, self.app)
+        user = self.app.current_user or "visitante"
+        self.info.configure(text=f"{user} | {now}")
+        self._after_id = self.frame.after(1000, self.update_time)

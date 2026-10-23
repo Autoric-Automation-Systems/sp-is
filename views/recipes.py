@@ -1,142 +1,137 @@
 import tkinter as tk
-from components.layout import BaseLayout
-from services.recipe_service import list_recipes
-from views.recipe_edit import RecipeEditView
-from services.recipe_service import delete_recipe
 from tkinter import messagebox
+
+from components import ui
+from services.recipe_service import delete_recipe, list_recipes
 from styles.theme import *
+from views.base_page import Page
 
-class RecipesView:
-    def __init__(self, parent, app):
-        self.app = app
 
-        layout = BaseLayout(parent, app)
+class RecipesPage(Page):
+    route = "recipes"
 
-        tk.Label(
-            layout.content,
-            text="RECEITAS",
-            font=FONT_TITLE,
-            fg=TEXT,
-            bg=BG
-        ).pack(pady=(18, 8))
+    def build(self):
+        self.recipes = []
+        self.selected = tk.StringVar()
 
-        tk.Button(
-            layout.content,
-            text="Nova Receita",
-            font=BUTTON_FONT,
-            fg=BUTTON_TEXT,
-            bg=BUTTON_BG,
-            activebackground=BUTTON_ACTIVE,
-            activeforeground=BUTTON_TEXT,
-            bd=0,
-            highlightthickness=0,
-            cursor="hand2",
-            command=lambda: self.new_recipe()
-        ).pack(pady=(0, 10))
+        body = ui.frame(self, "bg")
+        body.pack(fill="both", expand=True, padx=20, pady=12)
 
-        self.list_frame = tk.Frame(layout.content, bg=BG)
-        self.list_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        header = ui.frame(body, "bg")
+        header.pack(fill="x", pady=(0, 10))
+        ui.label(header, "RECEITAS", kind="title").pack(side="left")
+        ui.button(
+            header, "Nova receita", command=self.new_recipe, variant="primary"
+        ).pack(side="right")
 
+        active_panel = ui.panel(
+            body,
+            title="Receita em uso",
+            subtitle="A receita selecionada é usada nos ciclos da página Principal.",
+            pack=False,
+        )
+        active_panel.pack(fill="x", pady=(0, 10))
+
+        row = ui.frame(active_panel.content, "card")
+        row.pack(fill="x")
+        self.combo = ui.dropdown(row, self.selected, [], width=30)
+        self.combo.pack(side="left")
+        ui.button(row, "Usar", command=self.use_selected, size="sm").pack(
+            side="left", padx=(8, 0)
+        )
+
+        self.list_panel = ui.panel(body, title="Receitas cadastradas", pack=False)
+        self.list_panel.pack(fill="both", expand=True)
+        self.list_frame = self.list_panel.content
+
+    # ------------------------------------------------------------------ dados
+    def on_show(self):
+        self.app.refresh_header_stats()
         self.load_recipes()
 
     def load_recipes(self):
-        for w in self.list_frame.winfo_children():
-            w.destroy()
+        self.recipes = list_recipes()
+        names = [recipe["name"] for recipe in self.recipes]
+        self.combo.configure(values=names)
 
-        recipes = list_recipes()
+        active = self.app.current_recipe
+        active_name = active["name"] if active else ""
+        self.selected.set(active_name or (names[0] if names else ""))
 
-        # Cabeçalho
-        header = tk.Frame(
-            self.list_frame,
-            bg=HEADER_BG,
-            bd=0,
-            highlightbackground=BORDER,
-            highlightthickness=1
+        for child in self.list_frame.winfo_children():
+            child.destroy()
+
+        head = ui.frame(self.list_frame, "header")
+        head.pack(fill="x")
+        ui.label(head, "Nome", kind="small", bg=HEADER_BG).pack(
+            side="left", fill="x", expand=True, padx=12, pady=7
         )
-        header.pack(fill="x")
-        tk.Label(
-            header,
-            text="Nome",
-            font=FONT_HEADER,
-            fg=TEXT,
-            bg=HEADER_BG,
-            anchor="w"
-        ).pack(side="left", padx=16, pady=8, fill="x", expand=True)
-        tk.Label(
-            header,
-            text="Ações",
-            font=FONT_HEADER,
-            fg=TEXT,
-            bg=HEADER_BG,
-            anchor="e"
-        ).pack(side="right", padx=16, pady=8)
+        ui.label(head, "Atualizada em", kind="small", bg=HEADER_BG, width=18, anchor="w").pack(
+            side="left", padx=8
+        )
+        ui.label(head, "Ações", kind="small", bg=HEADER_BG).pack(side="right", padx=18)
 
-        for idx, r in enumerate(recipes):
-            bg_color = CARD if idx % 2 == 0 else BG
-
-            row = tk.Frame(
-                self.list_frame,
-                bg=bg_color,
-                bd=0,
-                highlightbackground=BORDER,
-                highlightthickness=1
+        if not self.recipes:
+            ui.label(self.list_frame, "Nenhuma receita cadastrada.", kind="muted").pack(
+                anchor="w", pady=16, padx=12
             )
-            row.pack(fill="x", pady=2)
+            return
 
-            tk.Label(
-                row,
-                text=r["name"],
-                font=FONT,
-                fg=TEXT,
-                bg=bg_color,
-                anchor="w"
-            ).pack(side="left", padx=16, pady=8, fill="x", expand=True)
+        for index, recipe in enumerate(self.recipes):
+            bg = CARD if index % 2 == 0 else BG
+            row = ui.frame(self.list_frame, bg)
+            row.pack(fill="x", pady=1)
 
-            actions = tk.Frame(row, bg=bg_color)
+            name_frame = ui.frame(row, bg)
+            name_frame.pack(side="left", fill="x", expand=True, padx=12, pady=7)
+            ui.label(name_frame, recipe["name"], kind="bold", bg=bg).pack(side="left")
+            if recipe["name"] == active_name:
+                ui.badge(name_frame, "EM USO", PRIMARY).pack(side="left", padx=(8, 0))
+
+            updated = recipe.get("updated_at") or recipe.get("created_at") or "—"
+            ui.label(row, str(updated), kind="small", bg=bg, width=18, anchor="w").pack(
+                side="left", padx=8
+            )
+
+            actions = ui.frame(row, bg)
             actions.pack(side="right", padx=10)
+            if recipe["name"] != active_name:
+                ui.button(
+                    actions, "Usar", command=lambda r=recipe: self.use(r),
+                    variant="primary", size="sm", width=7,
+                ).pack(side="left", padx=2)
+            ui.button(
+                actions, "Editar", command=lambda r=recipe: self.edit(r),
+                size="sm", width=7,
+            ).pack(side="left", padx=2)
+            ui.button(
+                actions, "Excluir", command=lambda r=recipe: self.remove(r),
+                variant="danger", size="sm", width=7,
+            ).pack(side="left", padx=2)
 
-            edit_btn = tk.Button(
-                actions,
-                text="Editar",
-                font=BUTTON_FONT,
-                fg=BUTTON_TEXT,
-                bg=BUTTON_BG,
-                activebackground=BUTTON_ACTIVE,
-                activeforeground=BUTTON_TEXT,
-                bd=0,
-                highlightthickness=0,
-                cursor="hand2",
-                command=lambda r=r: self.edit(r),
-                width=8
-            )
-            edit_btn.pack(side="left", padx=2)
+    # ------------------------------------------------------------------ ações
+    def use_selected(self):
+        name = self.selected.get()
+        for recipe in self.recipes:
+            if recipe["name"] == name:
+                self.use(recipe)
+                return
 
-            del_btn = tk.Button(
-                actions,
-                text="Excluir",
-                font=BUTTON_FONT,
-                fg=BUTTON_TEXT,
-                bg=DANGER,
-                activebackground=DANGER_HOVER,
-                activeforeground=BUTTON_TEXT,
-                bd=0,
-                highlightthickness=0,
-                cursor="hand2",
-                command=lambda r=r: self.remove(r),
-                width=8
-            )
-            del_btn.pack(side="left", padx=2)
+    def use(self, recipe):
+        self.app.set_active_recipe(recipe)
+        self.load_recipes()
 
     def remove(self, recipe):
-        confirm = messagebox.askyesno("Confirma", f"Excluir {recipe['name']}?")
-        if confirm:
-            delete_recipe(recipe)
+        if not messagebox.askyesno("Confirma", f"Excluir {recipe['name']}?"):
+            return
+        if delete_recipe(recipe):
+            self.app.reload_active_recipe()
             self.load_recipes()
-            
+        else:
+            messagebox.showerror("Erro", "Não foi possível excluir a receita.")
+
     def new_recipe(self):
-        self.app.clear()
-        RecipeEditView(self.app.container, self.app, None)
+        self.app.show_recipe_edit(None)
 
     def edit(self, recipe):
-        self.app.clear()
-        RecipeEditView(self.app.container, self.app, recipe)
+        self.app.show_recipe_edit(recipe)

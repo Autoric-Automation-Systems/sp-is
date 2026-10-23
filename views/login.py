@@ -1,95 +1,99 @@
+"""Diálogo de login (a aplicação inicia em modo visitante)."""
+import logging
 import os
-import tkinter as tk
+
+import customtkinter as ctk
+from PIL import Image
+
+from components import ui
+from paths import ASSETS_DIR
 from styles.theme import *
-from PIL import Image, ImageTk
 
-LOGODEV_PATH = "assets/logo-dev.png"
-LOGO_PATH = "assets/logo.png"
+LOGGER = logging.getLogger(__name__)
 
-class LoginView:
-    def __init__(self, parent, app):
+LOGODEV_PATH = ASSETS_DIR / "logo-dev.png"
+LOGO_PATH = ASSETS_DIR / "logo.png"
+
+ADMIN_USER = os.environ.get("SPIS_ADMIN_USER", "admin")
+ADMIN_PASSWORD = os.environ.get("SPIS_ADMIN_PASSWORD", "admin")
+
+
+class LoginDialog:
+    def __init__(self, parent, app, next_route=None):
         self.app = app
-        frame = tk.Frame(
-            parent,
-            bg=BG,
-            padx=40,
-            pady=40,
-            relief="flat",
-            bd=0,
-            highlightbackground=BORDER,
-            highlightthickness=1
+        self.next_route = next_route
+
+        self.window = ctk.CTkToplevel(parent)
+        self.window.title("Entrar")
+        self.window.configure(fg_color=BG)
+        self.window.transient(parent)
+        self.window.resizable(False, False)
+
+        frame = ctk.CTkFrame(
+            self.window, fg_color=CARD, corner_radius=10, border_width=1,
+            border_color=BORDER,
         )
-        frame.place(relx=0.5, rely=0.5, anchor="center")
+        frame.pack(fill="both", expand=True, padx=8, pady=8)
 
-        # -------- LOGO --------
         try:
-            img = Image.open(LOGO_PATH)
-            img = img.resize((420, 180))
-            self.logo = ImageTk.PhotoImage(img)
-            tk.Label(frame, image=self.logo, bg=BG).pack(pady=(0, 18))
-        except Exception as e:
-            print("Erro ao carregar imagem:", e)
+            image = Image.open(LOGO_PATH)
+            self.logo = ctk.CTkImage(light_image=image, dark_image=image, size=(280, 120))
+            ctk.CTkLabel(frame, image=self.logo, text="", fg_color=CARD).pack(pady=(6, 8))
+        except Exception as exc:
+            LOGGER.warning("Erro ao carregar imagem: %s", exc)
 
-        # Título
-        tk.Label(frame, text="LOGIN", font=FONT_TITLE, fg=TEXT, bg=BG).pack(pady=(0, 18))
+        ui.label(frame, "ENTRAR", kind="header", bg=CARD).pack(pady=(0, 12))
 
-        # Login form
-        entry_opts = {
-            "bg": INPUT_BG,
-            "fg": TEXT,
-            "insertbackground": TEXT,
-            "font": FONT,
-            "relief": "flat",
-            "highlightthickness": 1,
-            "highlightbackground": INPUT_BORDER,
-            "highlightcolor": INPUT_FOCUS,
-            "width": 28,
-            "justify": "center"
-        }
-
-        self.user = tk.Entry(frame, **entry_opts)
-        self.user.pack(pady=6)
+        ui.label(frame, "Usuário", kind="small", bg=CARD).pack(anchor="w", padx=26)
+        self.user = ui.entry(frame, width=24, justify="left")
+        self.user.pack(fill="x", padx=26, pady=(2, 8))
         self.user.insert(0, "admin")
 
-        self.password = tk.Entry(frame, show="*", **entry_opts)
-        self.password.pack(pady=6)
+        ui.label(frame, "Senha", kind="small", bg=CARD).pack(anchor="w", padx=26)
+        self.password = ui.entry(frame, width=24, justify="left", show="*")
+        self.password.pack(fill="x", padx=26, pady=(2, 8))
         self.password.insert(0, "admin")
 
-        self.msg = tk.Label(frame, text="", fg=DANGER, bg=BG, font=FONT)
-        self.msg.pack(pady=(2, 8))
+        self.msg = ui.label(frame, "", kind="small", bg=CARD, fg=DANGER)
+        self.msg.pack(pady=(0, 6))
 
-        tk.Button(
-            frame,
-            text="Entrar",
-            command=self.login,
-            bg=BUTTON_BG,
-            fg=BUTTON_TEXT,
-            font=BUTTON_FONT,
-            activebackground=BUTTON_ACTIVE,
-            activeforeground=BUTTON_TEXT,
-            relief="flat",
-            bd=0,
-            highlightthickness=0,
-            cursor="hand2",
-            width=18,
-            pady=6
-        ).pack(pady=(0, 18))
+        ui.button(
+            frame, "Entrar", command=self.login, variant="primary", size="lg"
+        ).pack(fill="x", padx=26, pady=(0, 6))
+        ui.button(
+            frame, "Cancelar", command=self.close, variant="secondary", size="md"
+        ).pack(fill="x", padx=26)
 
-        # -------- LOGO DEV --------
         try:
-            img = Image.open(LOGODEV_PATH)
-            img = img.resize((180, 48))
-            self.logodev = ImageTk.PhotoImage(img)
-            tk.Label(frame, image=self.logodev, bg=BG).pack(pady=(0, 2))
-        except Exception as e:
-            print("Erro ao carregar imagem:", e)
+            image = Image.open(LOGODEV_PATH)
+            self.logodev = ctk.CTkImage(light_image=image, dark_image=image, size=(140, 38))
+            ctk.CTkLabel(frame, image=self.logodev, text="", fg_color=CARD).pack(pady=(12, 8))
+        except Exception as exc:
+            LOGGER.warning("Erro ao carregar imagem: %s", exc)
 
-        # Sub-Title
-        tk.Label(frame, text="www.autoric.com.br", font=FONT_SMALL, fg=TEXT_DIM, bg=BG).pack(pady=(0, 2))
+        self.window.bind("<Return>", lambda _event: self.login())
+        self.window.bind("<Escape>", lambda _event: self.close())
+
+        self.window.update_idletasks()
+        width, height = 420, self.window.winfo_reqheight()
+        x = parent.winfo_rootx() + max(0, (parent.winfo_width() - width) // 2)
+        y = parent.winfo_rooty() + max(0, (parent.winfo_height() - height) // 2)
+        self.window.geometry(f"{width}x{height}+{x}+{y}")
+        self.window.grab_set()
+        self.user.focus_set()
 
     def login(self):
-        if self.user.get() == "admin" and self.password.get() == "admin":
+        if self.user.get() == ADMIN_USER and self.password.get() == ADMIN_PASSWORD:
             self.app.current_user = "admin"
-            self.app.show_production()
+            next_route = self.next_route
+            self.close()
+            self.app.on_login(next_route)
         else:
-            self.msg.config(text="Usuário ou senha inválidos")
+            self.msg.configure(text="Usuário ou senha inválidos")
+
+    def close(self):
+        try:
+            self.window.grab_release()
+        except Exception:
+            pass
+        self.window.destroy()

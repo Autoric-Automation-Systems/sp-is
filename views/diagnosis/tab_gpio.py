@@ -1,6 +1,6 @@
 """Aba GPIO - Mostra status REAL de todos os 40 pinos via pinctrl"""
 import tkinter as tk
-from tkinter import ttk
+from components import ui
 from styles.theme import *
 from processes.gpio_checker import GpioChecker
 from .base_tab import BaseTab
@@ -63,14 +63,8 @@ class GpioTab(BaseTab):
         super().__init__(parent)
 
         # Scroll
-        cv = tk.Canvas(self.container, bg=CARD, highlightthickness=0)
-        sb = tk.Scrollbar(self.container, orient="vertical", command=cv.yview)
-        sf = tk.Frame(cv, bg=CARD)
-        sf.bind("<Configure>", lambda e: cv.configure(scrollregion=cv.bbox("all")))
-        cv.create_window((0,0), window=sf, anchor="nw")
-        cv.configure(yscrollcommand=sb.set)
-        cv.pack(side="left", fill="both", expand=True)
-        sb.pack(side="right", fill="y")
+        cv, sf = ui.scrollable(self.container, bg=CARD)
+        cv.pack(fill="both", expand=True)
 
         # Título
         title = tk.Label(sf, text="GPIO Pinout - Status em Tempo Real", 
@@ -78,17 +72,17 @@ class GpioTab(BaseTab):
         title.pack(anchor="w", padx=16, pady=(16,8))
 
         # Frame para os pinos
-        pins_frame = tk.Frame(sf, bg=CARD)
+        pins_frame = ui.frame(sf, "card")
         pins_frame.pack(fill="both", expand=True, padx=16, pady=8)
 
         self.pin_widgets = {}  # {pino_fisico: {side: "left"/"right", label_widgets}}
 
         # Cabeçalho (2 conjuntos: esquerda e direita)
-        header_frame = tk.Frame(pins_frame, bg=CARD)
+        header_frame = ui.frame(pins_frame, "card")
         header_frame.pack(fill="x", pady=(0,8))
 
         # Cabeçalho lado esquerdo
-        left_header = tk.Frame(header_frame, bg=CARD)
+        left_header = ui.frame(header_frame, "card")
         left_header.pack(side="left", fill="x", expand=True)
         tk.Label(left_header, text="Pino", font=FONT_BOLD, fg=TEXT_DIM, bg=CARD, width=5).pack(side="left", padx=2)
         tk.Label(left_header, text="BCM", font=FONT_BOLD, fg=TEXT_DIM, bg=CARD, width=5).pack(side="left", padx=2)
@@ -101,7 +95,7 @@ class GpioTab(BaseTab):
         tk.Label(header_frame, text="  ", bg=CARD).pack(side="left")
 
         # Cabeçalho lado direito
-        right_header = tk.Frame(header_frame, bg=CARD)
+        right_header = ui.frame(header_frame, "card")
         right_header.pack(side="left", fill="x", expand=True)
         tk.Label(right_header, text="Pino", font=FONT_BOLD, fg=TEXT_DIM, bg=CARD, width=5).pack(side="left", padx=2)
         tk.Label(right_header, text="BCM", font=FONT_BOLD, fg=TEXT_DIM, bg=CARD, width=5).pack(side="left", padx=2)
@@ -116,7 +110,7 @@ class GpioTab(BaseTab):
             row_frame.pack(fill="x", pady=2)
 
             # --- Lado esquerdo ---
-            pin_esq_frame = tk.Frame(row_frame, bg=CARD)
+            pin_esq_frame = ui.frame(row_frame, "card")
             pin_esq_frame.pack(side="left", fill="x", expand=True)
 
             widgets_esq = self._create_pin_widgets(pin_esq_frame, p_esq, bcm_esq)
@@ -126,14 +120,14 @@ class GpioTab(BaseTab):
             tk.Label(row_frame, text="  ", bg=CARD).pack(side="left")
 
             # --- Lado direito ---
-            pin_dir_frame = tk.Frame(row_frame, bg=CARD)
+            pin_dir_frame = ui.frame(row_frame, "card")
             pin_dir_frame.pack(side="left", fill="x", expand=True)
 
             widgets_dir = self._create_pin_widgets(pin_dir_frame, p_dir, bcm_dir)
             self.pin_widgets[p_dir] = {"side": "right", **widgets_dir}
 
         # Legenda
-        leg_frame = tk.Frame(sf, bg=CARD)
+        leg_frame = ui.frame(sf, "card")
         leg_frame.pack(anchor="w", padx=16, pady=(16,8))
         
         tk.Label(leg_frame, text="Modo: ", font=FONT_BOLD, fg=TEXT_DIM, bg=CARD).pack(side="left")
@@ -201,43 +195,45 @@ class GpioTab(BaseTab):
 
         # Define nome
         nome = PIN_NAMES.get(pino_fisico, f"GPIO{bcm}" if bcm is not None else "---")
-        w["nome"].config(text=nome)
+        w["nome"].configure(text=nome)
 
         # Se não tem BCM (pinos de alimentação/GND)
         if bcm is None:
             modo_especial = PIN_MODES.get(pino_fisico, "---")
-            w["modo"].config(text=modo_especial, fg="#6B7280")
-            w["pull"].config(text="--", fg=TEXT_DIM)
-            w["val"].config(text="--", fg=TEXT_DIM)
-            w["pino"].config(fg=TEXT_DIM)
-            w["bcm"].config(text="--", fg=TEXT_DIM)
+            w["modo"].configure(text=modo_especial, fg="#6B7280")
+            w["pull"].configure(text="--", fg=TEXT_DIM)
+            w["val"].configure(text="--", fg=TEXT_DIM)
+            w["pino"].configure(fg=TEXT_DIM)
+            w["bcm"].configure(text="--", fg=TEXT_DIM)
             return
 
         # Pino com GPIO
-        w["bcm"].config(text=str(bcm), fg=TEXT_DIM)
-        w["pino"].config(fg=TEXT_DIM)
+        w["bcm"].configure(text=str(bcm), fg=TEXT_DIM)
+        w["pino"].configure(fg=TEXT_DIM)
 
         if bcm in pinos_status:
             info = pinos_status[bcm]
             mode = info["mode"]
             pull = info["pull"]
             value = info["value"]
-            func = info["function"]
+            function = info["function"]
 
             # Atualiza widgets
-            w["nome"].config(text=f"GPIO{bcm}", fg=TEXT)
+            w["nome"].configure(
+                text=function.split()[0] if function else f"GPIO{bcm}", fg=TEXT
+            )
             
             mode_color = mode_colors.get(mode, TEXT_DIM)
-            w["modo"].config(text=mode, fg=mode_color)
+            w["modo"].configure(text=mode, fg=mode_color)
             
             pull_symbol = pull_map.get(pull, pull)
-            w["pull"].config(text=pull_symbol, fg=TEXT_DIM)
+            w["pull"].configure(text=pull_symbol, fg=TEXT_DIM)
             
             value_color = value_colors.get(value, TEXT_DIM)
-            w["val"].config(text=value.upper(), fg=value_color)
+            w["val"].configure(text=value.upper(), fg=value_color)
         else:
             # Sem dados - pino não configurado/exportado
-            w["nome"].config(text=f"GPIO{bcm}", fg=TEXT_DIM)
-            w["modo"].config(text="--", fg=TEXT_DIM)
-            w["pull"].config(text="--", fg=TEXT_DIM)
-            w["val"].config(text="--", fg=TEXT_DIM)
+            w["nome"].configure(text=f"GPIO{bcm}", fg=TEXT_DIM)
+            w["modo"].configure(text="--", fg=TEXT_DIM)
+            w["pull"].configure(text="--", fg=TEXT_DIM)
+            w["val"].configure(text="--", fg=TEXT_DIM)
