@@ -1,4 +1,20 @@
 {
-  "threshold": 300,
-  "min_brightness": 50
+  "threshold": 300.0,
+  "min_brightness": 50.0,
+  "active_recipe": "200ml",
+  "camera_source": "synthetic",
+  "rotate_180": false,
+  "trigger": {
+    "pin": 17
+  },
+  "ejector": {
+    "time_ms": 100
+  },
+  "io": {
+    "presence_pin": 27,
+    "ejection_pin": 22,
+    "ejector_pin": 23,
+    "led_pin": 24,
+    "active_high": true
+  }
 }

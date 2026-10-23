@@ -1,6 +1,6 @@
 {
-  "name": "Pote vidro",
-  "image": "data/images/pote_vidro.jpg",
+  "name": "500ml",
+  "image": "data/images/500ml.jpg",
   "roi": {
     "x1": 266,
     "y1": 307,
@@ -8,5 +8,5 @@
     "y2": 337
   },
   "created_at": "2026-04-07 20:19:57",
-  "updated_at": "2026-04-07 20:19:57"
+  "updated_at": "2026-10-21 16:12:41"
 }
