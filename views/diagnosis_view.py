@@ -68,7 +68,7 @@ class DiagnosisPage(Page):
             segmented_button_unselected_color=BUTTON_BG,
             segmented_button_unselected_hover_color=BUTTON_HOVER,
             text_color=TEXT,
-            segmented_button_font=ui.font("Segoe UI", 12, "bold"),
+            segmented_button_font=ui.font(size=12, weight="bold"),
         )
         self.tabview.pack(fill="both", expand=True, padx=24, pady=(12, 16))
 

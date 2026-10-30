@@ -2,11 +2,11 @@
 
 Backends disponíveis:
 - picamera2: Raspberry Pi (câmera CSI)
-- opencv: webcam USB ou câmera V4L2
+- opencv: webcam USB ou câmera V4L2 (Windows: DirectShow)
 - synthetic: frames gerados em memória, para desenvolvimento sem hardware
 
 Seleção por `SPIS_CAMERA` (auto | picamera | opencv | synthetic). Em `auto`,
-tenta picamera2, depois OpenCV e, por fim, o simulador.
+tenta picamera2 (só no Raspberry Pi), depois OpenCV e, por fim, o simulador.
 
 Contrato: `get_frame()` retorna uma imagem BGR (numpy) ou None se não houver
 frame disponível. A captura roda em thread própria para não bloquear a UI.
@@ -14,13 +14,15 @@ frame disponível. A captura roda em thread própria para não bloquear a UI.
 import glob
 import logging
 import os
-import sys
 import threading
 import time
+from pathlib import Path
 
 import cv2
 import numpy as np
 
+import platform_support
+from paths import SIMULATION_DIR
 from services.config_service import load_config
 
 LOGGER = logging.getLogger(__name__)
@@ -28,6 +30,10 @@ LOGGER = logging.getLogger(__name__)
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
 FRAME_INTERVAL = 0.03
+
+SIM_INTERVAL_SECONDS = 4.0
+SIM_SCAN_INTERVAL_SECONDS = 1.0
+SIMULATION_EXTENSIONS = (".jpg", ".jpeg", ".png", ".bmp", ".webp")
 
 
 class PicameraBackend:
@@ -72,11 +78,26 @@ class PicameraBackend:
             self.picam2.close()
 
 
+def _open_capture(index):
+    """Abre a webcam com a API nativa da plataforma (DirectShow no Windows)."""
+    if platform_support.WINDOWS:
+        try:
+            capture = cv2.VideoCapture(int(index), cv2.CAP_DSHOW)
+        except cv2.error:
+            LOGGER.debug("DirectShow indisponível para a câmera %s", index, exc_info=True)
+            capture = None
+        if capture is not None:
+            if capture.isOpened():
+                return capture
+            capture.release()
+    return cv2.VideoCapture(int(index))
+
+
 class OpenCVBackend:
     def __init__(self, index=None):
         index = int(index if index is not None else os.environ.get("SPIS_CAMERA_INDEX", "0"))
         self.name = f"opencv:{index}"
-        self.cap = cv2.VideoCapture(index)
+        self.cap = _open_capture(index)
         if not self.cap.isOpened():
             self.cap.release()
             raise RuntimeError(f"câmera OpenCV {index} não disponível")
@@ -94,19 +115,111 @@ class OpenCVBackend:
 
 
 class SyntheticBackend:
-    """Câmera simulada: cena com garrafa e tampa alternando a cada 4 s.
+    """Câmera simulada para desenvolvimento e demonstração.
 
-    A cena é desenhada na orientação "correta" (texto legível). O giro de 180°
-    é aplicado depois, por `orient_frame`, exatamente como em uma câmera real.
+    Usa as imagens de `data/simulation/` (ou de `SPIS_SIM_DIR`), exibindo uma
+    por vez e alternando a cada `SIM_INTERVAL_SECONDS` (`SPIS_SIM_INTERVAL`).
+    Sem imagens na pasta, desenha a cena gerada com e sem tampa.
+
+    A cena é exibida na orientação "correta"; o giro de 180° é aplicado depois,
+    por `orient_frame`, exatamente como em uma câmera real.
     """
 
     name = "synthetic"
 
-    def __init__(self):
+    def __init__(self, frames_dir=None, interval=None):
         self._started_at = time.monotonic()
+        self._frames_dir = Path(frames_dir) if frames_dir is not None else _simulation_dir()
+        self._interval = _simulation_interval(interval)
+        self._images = []
+        self._entries = []
+        self._cache = {}
+        self._scanned_at = 0.0
+        self._scan()
 
     def read(self):
         elapsed = time.monotonic() - self._started_at
+        if time.monotonic() - self._scanned_at >= SIM_SCAN_INTERVAL_SECONDS:
+            self._scan()
+
+        if self._images:
+            index = _frame_index(len(self._images), elapsed, self._interval)
+            frame = self._load(self._images[index])
+            if frame is not None:
+                return frame
+
+        return self._draw_scene(elapsed)
+
+    def _scan(self):
+        """Relê a pasta: aceita inclusão, remoção e troca de conteúdo.
+
+        Compara nome **e** data de modificação para que substituir uma imagem
+        (mesmo nome, conteúdo novo) apareça sem reiniciar o aplicativo.
+        """
+        self._scanned_at = time.monotonic()
+        entries = []
+        try:
+            self._frames_dir.mkdir(parents=True, exist_ok=True)
+            candidates = sorted(
+                self._frames_dir.iterdir(), key=lambda item: item.name.lower()
+            )
+        except OSError:
+            candidates = []
+
+        for path in candidates:
+            if not path.is_file() or path.suffix.lower() not in SIMULATION_EXTENSIONS:
+                continue
+            try:
+                entries.append((path, path.stat().st_mtime_ns))
+            except OSError:
+                continue
+
+        if entries == self._entries:
+            return
+
+        self._entries = entries
+        self._images = [path for path, _stamp in entries]
+        self._cache = {}
+        if self._images:
+            LOGGER.info(
+                "Câmera simulada: %d imagem(ns) de %s (troca a cada %.1f s)",
+                len(self._images),
+                self._frames_dir,
+                self._interval,
+            )
+        else:
+            LOGGER.info(
+                "Câmera simulada: nenhuma imagem em %s; usando a cena gerada",
+                self._frames_dir,
+            )
+
+    def _load(self, path):
+        try:
+            key = (path, path.stat().st_mtime_ns)
+        except OSError:
+            return None
+
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached.copy()
+
+        try:
+            buffer = np.fromfile(str(path), dtype=np.uint8)
+            image = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
+        except (OSError, ValueError):
+            image = None
+
+        if image is None:
+            LOGGER.warning("Imagem de simulação ilegível: %s", path)
+            self._images = [item for item in self._images if item != path]
+            return None
+
+        frame = _fit_frame(image)
+        self._cache[key] = frame
+        return frame.copy()
+
+    def _draw_scene(self, elapsed):
+        """Cena gerada: garrafa com e sem tampa, alternando a cada 4 s."""
         frame = np.full((FRAME_HEIGHT, FRAME_WIDTH, 3), (24, 28, 34), dtype=np.uint8)
 
         for x in range(0, FRAME_WIDTH, 40):
@@ -118,7 +231,7 @@ class SyntheticBackend:
         cv2.rectangle(frame, (250, 250), (390, 470), (70, 82, 105), -1)
         cv2.rectangle(frame, (280, 150), (360, 250), (60, 72, 92), -1)
 
-        has_cap = int(elapsed // 4) % 2 == 0
+        has_cap = int(elapsed // SIM_INTERVAL_SECONDS) % 2 == 0
         if has_cap:
             cv2.ellipse(frame, (320, 150), (44, 16), 0, 0, 360, (205, 212, 220), -1)
         else:
@@ -137,6 +250,53 @@ class SyntheticBackend:
 
     def close(self):
         pass
+
+
+def _simulation_dir():
+    """Pasta das imagens da câmera simulada (SPIS_SIM_DIR tem precedência)."""
+    override = (os.environ.get("SPIS_SIM_DIR") or "").strip()
+    return Path(override) if override else SIMULATION_DIR
+
+
+def simulation_directory():
+    """Pasta pública das imagens usadas pela câmera simulada."""
+    return _simulation_dir()
+
+
+def _simulation_interval(interval=None):
+    value = interval
+    if value is None:
+        value = os.environ.get("SPIS_SIM_INTERVAL", SIM_INTERVAL_SECONDS)
+    try:
+        return max(0.1, float(value))
+    except (TypeError, ValueError):
+        return SIM_INTERVAL_SECONDS
+
+
+def _frame_index(count, elapsed, interval):
+    """Índice da imagem exibida após `elapsed` segundos."""
+    if count <= 0:
+        return 0
+    return int(elapsed // max(interval, 0.1)) % count
+
+
+def _fit_frame(image):
+    """Ajusta a imagem para 640x480 sem distorcer (preenche e corta o centro)."""
+    height, width = image.shape[:2]
+    if (width, height) == (FRAME_WIDTH, FRAME_HEIGHT):
+        return image
+
+    scale = max(FRAME_WIDTH / width, FRAME_HEIGHT / height)
+    size = (
+        max(FRAME_WIDTH, round(width * scale)),
+        max(FRAME_HEIGHT, round(height * scale)),
+    )
+    interpolation = cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
+    resized = cv2.resize(image, size, interpolation=interpolation)
+
+    top = (resized.shape[0] - FRAME_HEIGHT) // 2
+    left = (resized.shape[1] - FRAME_WIDTH) // 2
+    return resized[top:top + FRAME_HEIGHT, left:left + FRAME_WIDTH]
 
 
 def _configured_source():
@@ -180,7 +340,10 @@ def _create_backend(source=None):
     requested, argument = _parse_source(source if source is not None else _configured_source())
 
     if requested == "auto":
-        candidates = [("picamera", 0), ("opencv", 0), ("synthetic", None)]
+        candidates = []
+        if platform_support.csi_camera_supported():
+            candidates.append(("picamera", 0))
+        candidates.extend([("opencv", 0), ("synthetic", None)])
     elif requested == "synthetic":
         candidates = [("synthetic", None)]
     else:
@@ -219,6 +382,8 @@ def _create_backend(source=None):
 
 def _v4l2_devices():
     """Lista câmeras V4L2 usando sysfs (inclui a webcam do notebook)."""
+    if not platform_support.LINUX:
+        return []
     cameras = []
     sysfs_nodes = sorted(glob.glob("/sys/class/video4linux/video*"))
 
@@ -269,33 +434,38 @@ def list_available_cameras():
     """
     cameras = []
 
-    try:
-        from picamera2 import Picamera2
+    if platform_support.csi_camera_supported():
+        try:
+            from picamera2 import Picamera2
 
-        for index, info in enumerate(Picamera2.global_camera_info()):
-            model = info.get("Model") or info.get("model") or "CSI"
-            cameras.append({
-                "source": "picamera" if index == 0 else f"picamera:{index}",
-                "label": f"Câmera CSI ({model})",
-            })
-    except Exception:
-        pass
+            for index, info in enumerate(Picamera2.global_camera_info()):
+                model = info.get("Model") or info.get("model") or "CSI"
+                cameras.append({
+                    "source": "picamera" if index == 0 else f"picamera:{index}",
+                    "label": f"Câmera CSI ({model})",
+                })
+        except Exception:
+            pass
 
     video_devices = _v4l2_devices()
     cameras.extend(video_devices)
 
-    if not video_devices and not sys.platform.startswith("linux"):
+    if not platform_support.LINUX:
         # Windows/macOS: sonda índices comuns sem manter o dispositivo aberto.
         for index in range(4):
-            capture = cv2.VideoCapture(index)
+            capture = None
             try:
+                capture = _open_capture(index)
                 if capture.isOpened():
                     cameras.append({
                         "source": f"opencv:{index}",
                         "label": f"Câmera {index} (OpenCV)",
                     })
+            except Exception:
+                LOGGER.debug("Falha ao sondar a câmera %s", index, exc_info=True)
             finally:
-                capture.release()
+                if capture is not None:
+                    capture.release()
 
     cameras.append({"source": "synthetic", "label": "Câmera simulada (desenvolvimento)"})
     cameras.append({"source": "auto", "label": "Automática (detectar ao iniciar)"})

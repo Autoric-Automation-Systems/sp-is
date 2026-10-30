@@ -80,9 +80,12 @@ class IoTab(BaseTab):
                 command=lambda: self.io.set_simulated_input("ejection", self.sim_ejection.get()),
             ).pack(anchor="w", pady=2)
 
+        backend = self.io.backend_name
+        if self.io.simulated:
+            backend += " (sem GPIO físico nesta plataforma)"
         ui.label(
             self.body,
-            f"Backend de I/O: {self.io.backend_name}",
+            f"Backend de I/O: {backend}",
             kind="small",
         ).pack(anchor="w", pady=(12, 0))
 

@@ -6,7 +6,8 @@ from datetime import datetime
 from components.camera_view import orient_frame
 from services.config_service import load_config
 from services.io_service import get_io
-from services.vision_service import compare_roi
+from services.recipe_service import load_reference_image
+from services.vision_service import evaluate_rois
 from styles.theme import DANGER, SUCCESS
 
 LOGGER = logging.getLogger(__name__)
@@ -23,17 +24,17 @@ class RunCycle:
         """Permite usar a instância como callback de botão do Tkinter."""
         return self.run()
 
-    def _result(self, result, ok, config, elapsed_ms=0, frame=None, score=0,
-                brightness=0.0, record=True):
+    def _result(self, result, ok, config, elapsed_ms=0, frame=None, evaluation=None,
+                record=True):
+        evaluation = evaluation or {}
         return {
             "timestamp": datetime.now(),
             "recipe": (self.view.app.current_recipe or {}).get("name", "-"),
             "result": result,
             "ok": ok,
-            "score": score,
-            "threshold": config.get("threshold", 0),
-            "brightness": brightness,
+            "match": float(evaluation.get("score") or 0.0),
             "elapsed_ms": elapsed_ms,
+            "details": evaluation.get("rois") or [],
             "frame": frame,
             "record": record,
         }
@@ -61,37 +62,29 @@ class RunCycle:
             return self._result("CÂMERA INDISPONÍVEL", False, config)
 
         frame = orient_frame(frame, config.get("rotate_180", True))
-        result = compare_roi(frame, recipe.get("roi"), config["threshold"])
+
+        reference = load_reference_image(recipe)
+        evaluation = evaluate_rois(frame, reference, recipe.get("rois"))
         elapsed = max(1, int(round((time.perf_counter() - start) * 1000)))
 
-        if not result["valid"]:
-            self.view.set_status("ROI INVÁLIDO", DANGER)
-            self.view.time_label.configure(text=f"{elapsed} ms")
-            return self._result("ROI INVÁLIDO", False, config, elapsed, frame)
+        status = evaluation["result"]
+        ok = bool(evaluation["ok"])
 
-        score = result["edge_score"]
-        brightness = result["brightness"]
-        threshold = config["threshold"]
-
-        if brightness < config["min_brightness"]:
-            status, ok = "SEM GARRAFA", False
-        elif score > threshold:
-            status, ok = "ERRO: SEM TAMPA", False
-        else:
-            status, ok = "OK", True
-
-        if not ok and status == "ERRO: SEM TAMPA":
+        # Reprovado por um ROI específico: aciona o expulsor.
+        if not ok and evaluation.get("failed"):
             self.io.pulse_output("ejector", config["ejector"]["time_ms"])
 
-        self.view.set_status(status, SUCCESS if ok else DANGER, score, threshold)
+        self.view.set_status(status, SUCCESS if ok else DANGER, evaluation["rois"])
         self.view.time_label.configure(text=f"{elapsed} ms")
 
+        # Receita sem imagem de referência é erro de configuração, não uma
+        # reprovação da peça: não entra nas estatísticas (como "SEM RECEITA").
         return self._result(
             status,
             ok,
             config,
-            elapsed_ms=elapsed,
-            frame=frame,
-            score=score,
-            brightness=brightness,
+            elapsed,
+            frame,
+            evaluation,
+            record=status != "SEM REFERÊNCIA",
         )

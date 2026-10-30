@@ -1,6 +1,4 @@
 {
-  "threshold": 300.0,
-  "min_brightness": 50.0,
   "active_recipe": "200ml",
   "camera_source": "synthetic",
   "rotate_180": false,

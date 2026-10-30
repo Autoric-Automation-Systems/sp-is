@@ -6,9 +6,9 @@ A aba **GPIO / Portas** do Diagnóstico lê o estado real dos 40 pinos com
 `pinctrl get` (Raspberry Pi OS). Não é necessário exportar pinos em
 `/sys/class/gpio` para visualizar modo, pull e nível lógico.
 
-Se `pinctrl` não estiver disponível (por exemplo, em um PC), a tabela mostra
-`--` e a lista de GPIOs exportados via sysfs continua sendo exibida quando
-existir.
+Se `pinctrl` não estiver disponível (Windows, macOS ou Linux de mesa), a
+tabela mostra `--` e a lista de GPIOs exportados via sysfs continua sendo
+exibida quando existir.
 
 ## Sensores e saídas da inspeção (aba Sensores / Saídas)
 
@@ -25,7 +25,8 @@ O backend é escolhido automaticamente:
 
 1. `gpiozero` (preferencial no Raspberry Pi OS);
 2. `RPi.GPIO`;
-3. simulado (PC sem GPIO) — nesse modo, a aba permite simular os sensores.
+3. simulado (Windows, macOS ou Linux sem GPIO) — nesse modo, a aba permite
+   simular os sensores.
 
 ## Comportamento no ciclo de inspeção
 

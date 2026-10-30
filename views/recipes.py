@@ -1,4 +1,3 @@
-import tkinter as tk
 from tkinter import messagebox
 
 from components import ui
@@ -12,7 +11,6 @@ class RecipesPage(Page):
 
     def build(self):
         self.recipes = []
-        self.selected = tk.StringVar()
 
         body = ui.frame(self, "bg")
         body.pack(fill="both", expand=True, padx=20, pady=12)
@@ -20,25 +18,14 @@ class RecipesPage(Page):
         header = ui.frame(body, "bg")
         header.pack(fill="x", pady=(0, 10))
         ui.label(header, "RECEITAS", kind="title").pack(side="left")
+        ui.label(
+            header,
+            "A receita em uso é escolhida no topo da janela e vale para todas as telas.",
+            kind="small",
+        ).pack(side="left", padx=(12, 0), pady=(8, 0))
         ui.button(
             header, "Nova receita", command=self.new_recipe, variant="primary"
         ).pack(side="right")
-
-        active_panel = ui.panel(
-            body,
-            title="Receita em uso",
-            subtitle="A receita selecionada é usada nos ciclos da página Principal.",
-            pack=False,
-        )
-        active_panel.pack(fill="x", pady=(0, 10))
-
-        row = ui.frame(active_panel.content, "card")
-        row.pack(fill="x")
-        self.combo = ui.dropdown(row, self.selected, [], width=30)
-        self.combo.pack(side="left")
-        ui.button(row, "Usar", command=self.use_selected, size="sm").pack(
-            side="left", padx=(8, 0)
-        )
 
         self.list_panel = ui.panel(body, title="Receitas cadastradas", pack=False)
         self.list_panel.pack(fill="both", expand=True)
@@ -51,12 +38,9 @@ class RecipesPage(Page):
 
     def load_recipes(self):
         self.recipes = list_recipes()
-        names = [recipe["name"] for recipe in self.recipes]
-        self.combo.configure(values=names)
 
         active = self.app.current_recipe
         active_name = active["name"] if active else ""
-        self.selected.set(active_name or (names[0] if names else ""))
 
         for child in self.list_frame.winfo_children():
             child.destroy()
@@ -87,6 +71,17 @@ class RecipesPage(Page):
             ui.label(name_frame, recipe["name"], kind="bold", bg=bg).pack(side="left")
             if recipe["name"] == active_name:
                 ui.badge(name_frame, "EM USO", PRIMARY).pack(side="left", padx=(8, 0))
+            rois = recipe.get("rois") or []
+            if rois:
+                ui.label(
+                    name_frame,
+                    " · ".join(
+                        f"{item['name']} {item['min_match']:g}–{item['max_match']:g}%"
+                        for item in rois
+                    ),
+                    kind="small",
+                    bg=bg,
+                ).pack(side="left", padx=(10, 0))
 
             updated = recipe.get("updated_at") or recipe.get("created_at") or "—"
             ui.label(row, str(updated), kind="small", bg=bg, width=18, anchor="w").pack(
@@ -110,13 +105,6 @@ class RecipesPage(Page):
             ).pack(side="left", padx=2)
 
     # ------------------------------------------------------------------ ações
-    def use_selected(self):
-        name = self.selected.get()
-        for recipe in self.recipes:
-            if recipe["name"] == name:
-                self.use(recipe)
-                return
-
     def use(self, recipe):
         self.app.set_active_recipe(recipe)
         self.load_recipes()

@@ -5,6 +5,7 @@ from styles.theme import *
 from processes.monitor import SystemMonitor
 from processes.gpio_checker import GpioChecker
 from processes.camera_checker import CameraChecker
+import platform_support
 from .base_tab import BaseTab
 
 
@@ -26,7 +27,8 @@ class SystemTab(BaseTab):
         up = SystemMonitor.format_uptime(info["uptime_segundos"])
         self._make_info_table(sof, [
             ("Sistema", info["sistema"]), ("Versao", info["versao"]),
-            ("Arquitetura", info["arquitetura"]), ("Hostname", info["hostname"]),
+            ("Arquitetura", info["arquitetura"]), ("Plataforma", platform_support.system_label()),
+            ("Hostname", info["hostname"]),
             ("Processador", info["processador"]), ("Tempo de Atividade", up),
         ])
 
@@ -55,13 +57,22 @@ class SystemTab(BaseTab):
         cf = self._make_label_frame(left, "Camera", pack=False)
         cf.pack(fill="x", pady=(0, 8))
         self.cam_labels = {}
-        for m in ["libcamera", "raspistill", "opencv"]:
-            f = ui.frame(cf, "card")
-            f.pack(fill="x", pady=1)
-            tk.Label(f, text=m, font=FONT_BOLD, fg=TEXT_DIM, bg=CARD, width=14, anchor="w").pack(side="left")
-            lbl = tk.Label(f, text="---", font=FONT, fg=TEXT, bg=CARD)
-            lbl.pack(side="left")
-            self.cam_labels[m] = lbl
+        if CameraChecker.supported():
+            for m in ["libcamera", "raspistill", "opencv"]:
+                f = ui.frame(cf, "card")
+                f.pack(fill="x", pady=1)
+                tk.Label(f, text=m, font=FONT_BOLD, fg=TEXT_DIM, bg=CARD, width=14, anchor="w").pack(side="left")
+                lbl = tk.Label(f, text="---", font=FONT, fg=TEXT, bg=CARD)
+                lbl.pack(side="left")
+                self.cam_labels[m] = lbl
+        else:
+            ui.label(
+                cf,
+                "libcamera/raspistill só existem no Raspberry Pi. "
+                "A câmera em uso aparece em Configurações.",
+                kind="small",
+                bg=CARD,
+            ).pack(anchor="w")
 
         # Coluna direita
         right = ui.frame(scroll_frame, "card")
@@ -92,33 +103,45 @@ class SystemTab(BaseTab):
         if temp is not None:
             cor = SUCCESS if temp < 60 else (WARNING if temp < 75 else DANGER)
             self.temp_lbl.configure(text=f"Temperatura CPU: {temp:.1f} C", fg=cor)
+        else:
+            self.temp_lbl.configure(text="Temperatura CPU: não disponível", fg=TEXT_DISABLED)
         freq = GpioChecker.frequencia_cpu()
         if freq is not None:
-            self.freq_lbl.configure(text=f"Frequencia CPU: {freq:.0f} MHz")
+            self.freq_lbl.configure(text=f"Frequencia CPU: {freq:.0f} MHz", fg=TEXT)
+        else:
+            self.freq_lbl.configure(text="Frequencia CPU: não disponível", fg=TEXT_DISABLED)
         volt = GpioChecker.voltagem_cpu()
         if volt:
-            self.volt_lbl.configure(text=f"Voltagem Core: {volt}")
+            self.volt_lbl.configure(text=f"Voltagem Core: {volt}", fg=TEXT)
+        else:
+            self.volt_lbl.configure(text="Voltagem Core: não disponível", fg=TEXT_DISABLED)
         throttle = GpioChecker.throttled_status()
         if throttle:
-            self.throttle_lbl.configure(text=f"Throttling: {throttle}")
+            self.throttle_lbl.configure(text=f"Throttling: {throttle}", fg=TEXT)
+        else:
+            self.throttle_lbl.configure(text="Throttling: não disponível", fg=TEXT_DISABLED)
 
         usb = self._cached("usb", 10, GpioChecker.usb_ports)
-        self.portas_labels["USB"].configure(text=f"{usb} dispositivo(s)", fg=SUCCESS if usb else TEXT_DIM)
+        if usb is None:
+            self.portas_labels["USB"].configure(text="não disponível nesta plataforma", fg=TEXT_DIM)
+        else:
+            self.portas_labels["USB"].configure(text=f"{usb} dispositivo(s)", fg=SUCCESS if usb else TEXT_DIM)
         hok, hmsg = self._cached("hdmi", 10, GpioChecker.hdmi_status)
         self.portas_labels["HDMI"].configure(text=hmsg, fg=SUCCESS if hok else TEXT_DIM)
         eok, emsg = self._cached("ethernet", 10, GpioChecker.ethernet_status)
         self.portas_labels["Ethernet"].configure(text=emsg, fg=SUCCESS if eok else TEXT_DIM)
 
-        cam = self._cached("camera", 15, CameraChecker.check)
-        for m, lbl in self.cam_labels.items():
-            s = cam.get(m, "?")
-            if "Dispon" in str(s) or "OK" in str(s):
-                cor = SUCCESS
-            elif "Nao" in str(s) or "Erro" in str(s):
-                cor = TEXT_DISABLED
-            else:
-                cor = TEXT_DIM
-            lbl.configure(text=str(s), fg=cor)
+        if self.cam_labels:
+            cam = self._cached("camera", 15, CameraChecker.check)
+            for m, lbl in self.cam_labels.items():
+                s = cam.get(m, "?")
+                if "Dispon" in str(s) or "OK" in str(s):
+                    cor = SUCCESS
+                elif "Nao" in str(s) or "Erro" in str(s):
+                    cor = TEXT_DISABLED
+                else:
+                    cor = TEXT_DIM
+                lbl.configure(text=str(s), fg=cor)
 
         try:
             procs = SystemMonitor.top_processes(10)

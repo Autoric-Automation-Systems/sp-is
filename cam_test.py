@@ -1,3 +1,4 @@
+"""Teste rápido de captura da câmera CSI (exclusivo do Raspberry Pi)."""
 from picamera2 import Picamera2
 import cv2
 

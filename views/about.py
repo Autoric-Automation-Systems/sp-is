@@ -1,9 +1,9 @@
 """Página Sobre com a descrição do aplicativo."""
-import platform
 import sys
 
 import cv2
 
+import platform_support
 from components import ui
 from paths import BASE_DIR
 from styles.theme import *
@@ -59,9 +59,15 @@ class AboutPage(Page):
         info = ui.frame(panel.content, "card")
         info.pack(fill="x")
         rows = [
-            ("Sistema", f"{platform.system()} {platform.release()} ({platform.machine()})"),
+            ("Sistema", platform_support.system_label()),
             ("Python", sys.version.split()[0]),
             ("OpenCV", cv2.__version__),
+            (
+                "Hardware",
+                "Raspberry Pi (GPIO + câmera CSI)"
+                if platform_support.is_raspberry_pi()
+                else "PC (webcam USB e I/O simulado)",
+            ),
             ("Diretório", str(BASE_DIR)),
         ]
         for index, (key, value) in enumerate(rows):

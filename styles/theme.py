@@ -1,3 +1,8 @@
+from styles.fonts import family as _font_family
+
+# Família instalada na plataforma (Segoe UI no Windows, DejaVu Sans no Linux...).
+FAMILY = _font_family()
+
 # -------- BASE --------
 BG = "#0b0e14"           # Fundo mais profundo (quase preto, como o fundo do logo)
 CARD = "#141820"         # Cinza azulado escuro (extraído das sombras do ícone)
@@ -36,7 +41,7 @@ BUTTON_BG = "#1e293b"
 BUTTON_HOVER = "#334155"
 BUTTON_ACTIVE = "#475569"
 BUTTON_TEXT = TEXT
-BUTTON_FONT = ("Segoe UI", 11, "bold")
+BUTTON_FONT = (FAMILY, 11, "bold")
 
 # -------- CANVAS (Visão Industrial) --------
 CANVAS_BG = "#000000"
@@ -49,15 +54,15 @@ ROI_SECONDARY = "#10b981" # Verde esmeralda para o original/ok
 ROI_HANDLE = "#facc15"    # Amarelo para os pontos de manipulação
 
 # -------- FONTES --------
-# Mantendo a Segoe UI que é limpa e profissional para dashboards
-FONT = ("Segoe UI", 11)
-FONT_BOLD = ("Segoe UI", 11, "bold")
-FONT_SMALL = ("Segoe UI", 9)
-FONT_TITLE = ("Segoe UI", 18, "bold") # Aumentei um pouco para dar mais peso
-FONT_HEADER = ("Segoe UI", 14, "bold")
+# FAMILY resolve para a fonte instalada na plataforma (ver styles/fonts.py)
+FONT = (FAMILY, 11)
+FONT_BOLD = (FAMILY, 11, "bold")
+FONT_SMALL = (FAMILY, 9)
+FONT_TITLE = (FAMILY, 18, "bold") # Aumentei um pouco para dar mais peso
+FONT_HEADER = (FAMILY, 14, "bold")
 # -------- LAYOUT --------
 SIDEBAR_BG = "#0d1118"
-SIDEBAR_WIDTH = 220
+SIDEBAR_WIDTH = 236
 CONTENT_PAD = 24
 
 # -------- ESTADOS --------
@@ -73,5 +78,5 @@ SPACING_MD = 16
 SPACING_LG = 24
 SPACING_XL = 32
 
-FONT_VALUE = ("Segoe UI", 22, "bold")
-FONT_STAT = ("Segoe UI", 16, "bold")
+FONT_VALUE = (FAMILY, 22, "bold")
+FONT_STAT = (FAMILY, 16, "bold")

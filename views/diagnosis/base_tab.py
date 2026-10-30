@@ -79,7 +79,7 @@ class BaseTab:
         lbl = ctk.CTkLabel(
             parent,
             text=text,
-            font=ui.font("Segoe UI", int(font_size * 0.7), "bold"),
+            font=ui.font(size=int(font_size * 0.7), weight="bold"),
             text_color=fg,
             fg_color=CARD,
         )

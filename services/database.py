@@ -1,8 +1,13 @@
 """Repositório SQL das inspeções.
 
+Cada inspeção guarda o resultado agregado e a métrica por ROI em JSON
+(`details`): nome, retângulo, % de acerto e janela configurada. Assim a tela de
+análise continua explicando a decisão mesmo depois de a receita ser editada.
+
 Hoje usa SQLite local; a interface foi isolada para permitir trocar por um
 banco online (PostgreSQL/MySQL) sem alterar as views.
 """
+import json
 import logging
 import sqlite3
 from dataclasses import dataclass, field
@@ -23,15 +28,20 @@ CREATE TABLE IF NOT EXISTS inspections (
     recipe TEXT NOT NULL,
     result TEXT NOT NULL,
     ok INTEGER NOT NULL,
-    score INTEGER NOT NULL DEFAULT 0,
-    threshold REAL NOT NULL DEFAULT 0,
-    brightness REAL NOT NULL DEFAULT 0,
+    match REAL NOT NULL DEFAULT 0,
     elapsed_ms INTEGER NOT NULL DEFAULT 0,
+    details TEXT NOT NULL DEFAULT '[]',
     frame_jpeg BLOB
 );
 CREATE INDEX IF NOT EXISTS idx_inspections_timestamp ON inspections (timestamp);
 CREATE INDEX IF NOT EXISTS idx_inspections_recipe ON inspections (recipe);
 """
+
+# Colunas adicionadas depois da primeira versão do banco.
+_MIGRATION_COLUMNS = (
+    ("match", "REAL NOT NULL DEFAULT 0"),
+    ("details", "TEXT NOT NULL DEFAULT '[]'"),
+)
 
 
 @dataclass
@@ -40,10 +50,9 @@ class InspectionRecord:
     recipe: str
     result: str
     ok: bool
-    score: int = 0
-    threshold: float = 0
-    brightness: float = 0.0
+    match: float = 0.0
     elapsed_ms: int = 0
+    details: list = field(default_factory=list)
     frame_jpeg: bytes | None = field(default=None, repr=False)
 
     def frame_bgr(self):
@@ -55,6 +64,11 @@ class InspectionRecord:
     @property
     def time_text(self):
         return self.timestamp.strftime("%H:%M:%S")
+
+    @property
+    def match_text(self):
+        """Menor % de acerto entre os ROIs, para exibição compacta."""
+        return f"{self.match:.1f}%" if self.match else "—"
 
 
 class InspectionRepository:
@@ -68,25 +82,35 @@ class InspectionRepository:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.executescript(_SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self):
+        """Bancos criados antes das métricas por ROI recebem as colunas novas."""
+        columns = {
+            row["name"] for row in self._conn.execute("PRAGMA table_info(inspections)")
+        }
+        for name, definition in _MIGRATION_COLUMNS:
+            if name not in columns:
+                LOGGER.info("Migrando banco de inspeções: adicionando coluna %s", name)
+                self._conn.execute(f"ALTER TABLE inspections ADD COLUMN {name} {definition}")
 
     # ------------------------------------------------------------------ escrita
     def save(self, record):
         cursor = self._conn.execute(
             """
             INSERT INTO inspections
-                (timestamp, recipe, result, ok, score, threshold, brightness, elapsed_ms, frame_jpeg)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (timestamp, recipe, result, ok, match, elapsed_ms, details, frame_jpeg)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record.timestamp.isoformat(sep=" ", timespec="seconds"),
                 record.recipe,
                 record.result,
                 int(record.ok),
-                int(record.score),
-                float(record.threshold),
-                float(record.brightness),
+                float(record.match),
                 int(record.elapsed_ms),
+                json.dumps(record.details or [], ensure_ascii=False),
                 record.frame_jpeg,
             ),
         )
@@ -101,7 +125,7 @@ class InspectionRepository:
     def recent(self, limit=50):
         rows = self._conn.execute(
             """
-            SELECT timestamp, recipe, result, ok, score, threshold, brightness, elapsed_ms, frame_jpeg
+            SELECT timestamp, recipe, result, ok, match, elapsed_ms, details, frame_jpeg
             FROM inspections
             ORDER BY id DESC
             LIMIT ?
@@ -185,15 +209,20 @@ class InspectionRepository:
 
     @staticmethod
     def _to_record(row):
+        try:
+            details = json.loads(row["details"] or "[]")
+        except (TypeError, ValueError):
+            details = []
+        if not isinstance(details, list):
+            details = []
         return InspectionRecord(
             timestamp=datetime.fromisoformat(row["timestamp"]),
             recipe=row["recipe"],
             result=row["result"],
             ok=bool(row["ok"]),
-            score=row["score"],
-            threshold=row["threshold"],
-            brightness=row["brightness"],
+            match=float(row["match"] or 0.0),
             elapsed_ms=row["elapsed_ms"],
+            details=details,
             frame_jpeg=row["frame_jpeg"],
         )
 

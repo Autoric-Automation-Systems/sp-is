@@ -8,9 +8,11 @@ SECTIONS = (
     (
         "1. Preparar a receita",
         [
+            "A receita em uso fica no topo da janela (header) e vale em todas as telas.",
             "Abra Receitas e clique em Nova receita (é necessário estar logado).",
-            "Digite o nome, posicione a peça na esteira e desenhe o ROI sobre a região da tampa.",
-            "Salve. A receita passa a ser a receita em uso na tela Principal.",
+            "Digite o nome e ajuste os três ROIs (Tampa, Nível e ROI 3) com o mouse ou com os campos X/Y.",
+            "Cada ROI tem nome editável e uma janela de acerto em % da imagem de referência.",
+            "Salve. A receita passa a ser a receita em uso automaticamente.",
         ],
     ),
     (
@@ -18,30 +20,33 @@ SECTIONS = (
         [
             "Na tela Principal, confirme a receita em uso.",
             "Clique em EXECUTAR CICLO ou acione o trigger por pino, se houver.",
-            "O resultado aparece no painel da última captura e é salvo no histórico.",
+            "O resultado e o % de cada ROI aparecem no painel da última captura e no histórico.",
         ],
     ),
     (
         "3. Interpretar os resultados",
         [
-            "OK: peça aprovada.",
-            "ERRO: SEM TAMPA: muitas bordas no ROI — o expulsor é acionado.",
-            "SEM GARRAFA: brilho médio abaixo do mínimo configurado.",
-            "ROI INVÁLIDO / CÂMERA INDISPONÍVEL: erro de processo, sem acionar o expulsor.",
+            "OK: todos os ROIs ficaram dentro da janela de acerto.",
+            "ERRO: <ROI>: o % de acerto do ROI citado ficou fora da janela. Se mais de um falhar, todos aparecem (ex.: ERRO: NÍVEL + RÓTULO).",
+            "O expulsor é acionado em qualquer reprovação; o texto do resultado usa a cor do ROI reprovado.",
+            "SEM REFERÊNCIA / ROI INVÁLIDO / CÂMERA INDISPONÍVEL: erro de processo, sem acionar o expulsor.",
+            "O % de acerto compara a região com a imagem de referência salva na receita (quanto maior, mais parecida).",
         ],
     ),
     (
-        "4. Ajustar a sensibilidade",
+        "4. Ajustar a janela de acerto",
         [
-            "Em Configurações, ajuste Threshold (pixels de borda) e Brilho mínimo.",
-            "Valores maiores de threshold tornam a detecção de tampa mais tolerante.",
+            "Abra a receita e use 'Capturar referência' para congelar a imagem de comparação.",
+            "O campo 'Agora' mostra o % de acerto ao vivo de cada ROI.",
+            "Defina mínimo e máximo (ex.: 85 a 100%) e use os botões − / + para ajuste fino.",
         ],
     ),
     (
         "5. Verificar o hardware",
         [
             "Diagnósticos → Sensores / Saídas mostra o estado das entradas e permite testar o expulsor e o LED.",
-            "As abas CPU, Memória, Disco, GPIO, Rede e Sistema ajudam a diagnosticar o Raspberry Pi.",
+            "As abas CPU, Memória, Disco, Rede e Sistema funcionam em qualquer plataforma;",
+            "GPIO, sensores da placa e câmera CSI exigem Raspberry Pi (no PC o I/O é simulado).",
         ],
     ),
 )

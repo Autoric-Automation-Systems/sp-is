@@ -19,9 +19,9 @@ BUTTON_VARIANTS = {
 }
 
 BUTTON_SIZES = {
-    "sm": {"height": 30, "font": ("Segoe UI", 11, "bold"), "radius": 6},
-    "md": {"height": 38, "font": ("Segoe UI", 12, "bold"), "radius": 8},
-    "lg": {"height": 46, "font": ("Segoe UI", 14, "bold"), "radius": 9},
+    "sm": {"height": 30, "font": (FAMILY, 11, "bold"), "radius": 6},
+    "md": {"height": 38, "font": (FAMILY, 12, "bold"), "radius": 8},
+    "lg": {"height": 46, "font": (FAMILY, 14, "bold"), "radius": 9},
 }
 
 LABEL_KINDS = {
@@ -49,8 +49,9 @@ FRAME_VARIANTS = {
 _font_cache = {}
 
 
-def font(family="Segoe UI", size=13, weight="normal"):
+def font(family=None, size=13, weight="normal"):
     """CTkFont com cache (precisa ser criada depois do root)."""
+    family = family or FAMILY
     key = (family, size, weight)
     if key not in _font_cache:
         _font_cache[key] = ctk.CTkFont(family=family, size=size, weight=weight)
@@ -99,7 +100,7 @@ def button(parent, text, command=None, variant="secondary", size="md", **kwargs)
         "text_color": style["text"],
     }
     explicit_font = _font_from_kwargs(kwargs, None)
-    options["font"] = explicit_font or font("Segoe UI", sizing["font"][1], "bold")
+    options["font"] = explicit_font or font(size=sizing["font"][1], weight="bold")
     options.update(kwargs)
     return ctk.CTkButton(parent, text=text, command=command, **options)
 
@@ -115,7 +116,7 @@ def label(parent, text, kind="body", **kwargs):
         "text": text,
         "text_color": text_color,
         "fg_color": fg_color,
-        "font": font("Segoe UI", style["size"], style["weight"]),
+        "font": font(size=style["size"], weight=style["weight"]),
         "anchor": "w",
     }
     options["font"] = _font_from_kwargs(kwargs, options["font"])
@@ -158,7 +159,7 @@ def paragraph(parent, text, kind="body", padding=12, **kwargs):
         text=text,
         text_color=kwargs.pop("fg", style["color"]),
         fg_color=kwargs.pop("bg", "transparent"),
-        font=_font_from_kwargs(kwargs, font("Segoe UI", style["size"], style["weight"])),
+        font=_font_from_kwargs(kwargs, font(size=style["size"], weight=style["weight"])),
         justify="left",
         anchor="w",
         wraplength=640,
@@ -184,7 +185,7 @@ def badge(parent, text, color=SUCCESS, bg=None):
         parent,
         bg_color="transparent",
         text=text,
-        font=font("Segoe UI", 10, "bold"),
+        font=font(size=10, weight="bold"),
         text_color=PRIMARY_CONTRAST if color != DANGER else TEXT,
         fg_color=color if bg is None else bg,
         corner_radius=6,
@@ -218,22 +219,23 @@ def dropdown(parent, variable, values, command=None, width=28, state="readonly")
         dropdown_hover_color=BUTTON_BG,
         dropdown_text_color=TEXT,
         text_color=TEXT,
-        font=font("Segoe UI", 12),
-        dropdown_font=font("Segoe UI", 12),
+        font=font(size=12),
+        dropdown_font=font(size=12),
     )
     return widget
 
 
-def entry(parent, variable=None, width=24, **kwargs):
+def entry(parent, variable=None, width=24, px_width=None, **kwargs):
+    """Campo de texto padrão. `width` em caracteres ou `px_width` em pixels."""
     options = {
         "bg_color": "transparent",
-        "width": _chars_to_px(width, padding=16, minimum=90),
+        "width": px_width or _chars_to_px(width, padding=16, minimum=90),
         "height": 34,
         "corner_radius": 6,
         "fg_color": INPUT_BG,
         "border_color": INPUT_BORDER,
         "text_color": TEXT,
-        "font": font("Segoe UI", 12),
+        "font": font(size=12),
     }
     if variable is not None:
         options["textvariable"] = variable
@@ -259,7 +261,7 @@ def radio(parent, text, variable, value, **kwargs):
         text=text,
         variable=variable,
         value=value,
-        font=font("Segoe UI", 12),
+        font=font(size=12),
         text_color=TEXT,
         fg_color=PRIMARY,
         hover_color=PRIMARY_HOVER,
@@ -277,7 +279,7 @@ def checkbox(parent, text, variable, command=None, **kwargs):
         text=text,
         variable=variable,
         command=command,
-        font=font("Segoe UI", 12),
+        font=font(size=12),
         text_color=TEXT,
         fg_color=PRIMARY,
         hover_color=PRIMARY_HOVER,
@@ -310,7 +312,7 @@ class StatCard:
         self.value_label = ctk.CTkLabel(
             self.frame,
             text=value,
-            font=font("Segoe UI", 18, "bold"),
+            font=font(size=18, weight="bold"),
             text_color=accent,
             fg_color=CARD,
             anchor="w",

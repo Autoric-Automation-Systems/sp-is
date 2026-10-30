@@ -1,7 +1,31 @@
-"""Módulo de verificação de GPIO, portas físicas e periféricos do Raspberry Pi"""
+"""Verificação de GPIO, portas físicas e periféricos.
+
+No Raspberry Pi consulta pinctrl, sysfs, vcgencmd, lsusb e tvservice. Em outras
+plataformas (Windows, macOS, Linux de mesa) os recursos exclusivos do Pi
+retornam vazio/None e as telas de diagnóstico mostram apenas o que existe.
+"""
+import glob
 import os
 import subprocess
-import glob
+
+import platform_support
+
+# Evita abrir uma janela de console para cada comando externo no Windows.
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def _run(command, timeout=3):
+    """Executa um comando externo; devolve None quando ele não existe."""
+    try:
+        return subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            creationflags=_NO_WINDOW,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
 
 
 class GpioChecker:
@@ -11,11 +35,16 @@ class GpioChecker:
     def gpio_info():
         """Retorna dicionário com status completo do GPIO"""
         info = {
+            "plataforma": platform_support.system_label(),
+            "suportado": platform_support.io_hardware_supported(),
             "bibliotecas": [],
             "modos": {},
             "pinos_ocupados": [],
             "pinos_disponiveis": [],
         }
+
+        if not info["suportado"]:
+            return info
 
         # Verifica RPi.GPIO
         try:
@@ -57,12 +86,9 @@ class GpioChecker:
                 pass
 
         # Verifica wiringpi se existir
-        try:
-            result = subprocess.run(["gpio", "-v"], capture_output=True, text=True, timeout=2)
-            if result.returncode == 0:
-                info["bibliotecas"].append("wiringPi")
-        except:
-            pass
+        result = _run(["gpio", "-v"], timeout=2)
+        if result is not None and result.returncode == 0:
+            info["bibliotecas"].append("wiringPi")
 
         # Verifica pigpio
         try:
@@ -77,6 +103,8 @@ class GpioChecker:
     def gpio_read_all():
         """Tenta ler valores de todos os GPIOs via /sys/class/gpio"""
         resultados = {}
+        if not platform_support.LINUX:
+            return resultados
         gpio_base = "/sys/class/gpio"
         if not os.path.isdir(gpio_base):
             return resultados
@@ -98,28 +126,27 @@ class GpioChecker:
 
     @staticmethod
     def usb_ports():
-        """Lista dispositivos USB conectados"""
-        count = 0
-        try:
-            result = subprocess.run(["lsusb"], capture_output=True, text=True, timeout=3)
-            lines = [l for l in result.stdout.strip().split("\n") if l.strip()]
-            # Filtra hubs raiz Linux Foundation
-            reais = [l for l in lines if "Linux Foundation" not in l and "0000:0000" not in l]
-            count = len(reais)
-        except:
-            pass
-        return count
+        """Lista dispositivos USB conectados (None quando não há suporte)"""
+        if not platform_support.LINUX:
+            return None
+        result = _run(["lsusb"])
+        if result is None:
+            return None
+        lines = [l for l in result.stdout.strip().split("\n") if l.strip()]
+        # Filtra hubs raiz Linux Foundation
+        reais = [l for l in lines if "Linux Foundation" not in l and "0000:0000" not in l]
+        return len(reais)
 
     @staticmethod
     def hdmi_status():
         """Verifica status HDMI via tvservice"""
-        try:
-            result = subprocess.run(["tvservice", "-s"], capture_output=True, text=True, timeout=3)
+        if not platform_support.LINUX:
+            return False, "não disponível nesta plataforma"
+        result = _run(["tvservice", "-s"])
+        if result is not None:
             if "PAL" in result.stdout or "NTSC" in result.stdout or "HDMI" in result.stdout or "connected" in result.stdout.lower():
                 return True, result.stdout.strip()
             return False, "HDMI inativo"
-        except:
-            pass
         # Fallback /sys/class/drm
         try:
             for entry in os.listdir("/sys/class/drm"):
@@ -130,7 +157,7 @@ class GpioChecker:
                             status = f.read().strip()
                             if "connected" in status:
                                 return True, f"HDMI conectado ({entry})"
-        except:
+        except OSError:
             pass
         return False, "HDMI não detectado"
 
@@ -138,51 +165,53 @@ class GpioChecker:
     def ethernet_status():
         """Verifica se interfaces de rede estão ativas"""
         import psutil
+        # Prefixos usados no Linux (eth0, enp3s0, wlan0, wlP2p33s0) e no Windows
+        # ("Ethernet", "Wi-Fi"), comparados em minúsculas.
+        prefixes = ("eth", "en", "wlan", "wl", "wi-fi", "wifi")
         try:
-            stats = psutil.net_if_stats()
-            for name, s in stats.items():
-                if any(x in name for x in ["eth", "enx", "wlan", "Wi-Fi"]):
-                    if s.isup:
-                        return True, f"{name} ativo"
+            for name, stats in psutil.net_if_stats().items():
+                if name.lower().startswith(prefixes) and stats.isup:
+                    return True, f"{name} ativo"
             return False, "Nenhuma interface ativa"
-        except:
+        except Exception:
             return False, "Erro ao verificar"
 
     @staticmethod
     def i2c_detected():
         """Verifica dispositivos I2C"""
-        try:
-            result = subprocess.run(["i2cdetect", "-y", "1"], capture_output=True, text=True, timeout=3)
-            lines = result.stdout.strip().split("\n")
-            dispositivos = []
-            for line in lines[1:]:  # Pula cabeçalho
-                parts = line.split()
-                for p in parts[1:]:
-                    if p not in ["--", "UU"] and len(p) == 2:
-                        try:
-                            int(p, 16)
-                            dispositivos.append(p)
-                        except:
-                            pass
-            return dispositivos
-        except:
+        if not platform_support.LINUX:
             return []
+        result = _run(["i2cdetect", "-y", "1"])
+        if result is None:
+            return []
+        lines = result.stdout.strip().split("\n")
+        dispositivos = []
+        for line in lines[1:]:  # Pula cabeçalho
+            parts = line.split()
+            for p in parts[1:]:
+                if p not in ["--", "UU"] and len(p) == 2:
+                    try:
+                        int(p, 16)
+                        dispositivos.append(p)
+                    except ValueError:
+                        pass
+        return dispositivos
 
     @staticmethod
     def spi_detected():
         """Verifica se SPI está habilitado"""
-        try:
-            devices = sorted(glob.glob("/dev/spidev*"))
-            return devices
-        except:
+        if not platform_support.LINUX:
             return []
+        return sorted(glob.glob("/dev/spidev*"))
 
     @staticmethod
     def pinctrl_status():
         """Lê status REAL dos 40 pinos via pinctrl"""
         pinos = {}
-        try:
-            result = subprocess.run(["pinctrl", "get"], capture_output=True, text=True, timeout=3)
+        if not platform_support.LINUX:
+            return pinos
+        result = _run(["pinctrl", "get"])
+        if result is not None:
             for line in result.stdout.strip().split("\n"):
                 # Formato: "0: ip    pu | hi // ID_SDA/GPIO0 = input"
                 if ":" not in line:
@@ -231,57 +260,74 @@ class GpioChecker:
                         "value": value,
                         "function": func_name
                     }
-                except:
+                except (ValueError, IndexError):
                     pass
-        except:
-            pass
         return pinos
 
     @staticmethod
     def onewire_detected():
         """Verifica dispositivos 1-Wire"""
+        if not platform_support.LINUX:
+            return []
         try:
             if os.path.isdir("/sys/bus/w1/devices"):
                 devices = [d for d in os.listdir("/sys/bus/w1/devices") if d.startswith("28-") or d.startswith("10-")]
                 return devices
-        except:
+        except OSError:
             pass
         return []
 
     @staticmethod
     def temperatura_cpu():
-        """Lê temperatura da CPU (RPi)"""
+        """Lê temperatura da CPU (sysfs no RPi; psutil quando disponível)"""
         try:
-            with open("/sys/class/thermal/thermal_zone0/temp") as f:
-                temp = int(f.read().strip()) / 1000.0
-                return temp
-        except:
-            return None
+            with open("/sys/class/thermal/thermal_zone0/temp", encoding="ascii") as f:
+                return int(f.read().strip()) / 1000.0
+        except (OSError, ValueError):
+            pass
+
+        try:
+            import psutil
+
+            for entries in (psutil.sensors_temperatures() or {}).values():
+                for entry in entries:
+                    if entry.current:
+                        return float(entry.current)
+        except Exception:
+            pass
+        return None
 
     @staticmethod
     def frequencia_cpu():
-        """Lê frequência da CPU (RPi)"""
+        """Lê frequência da CPU em MHz (sysfs no RPi; psutil no PC)"""
         try:
-            with open("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq") as f:
-                freq = int(f.read().strip()) / 1000.0
-                return freq
-        except:
-            return None
+            with open("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", encoding="ascii") as f:
+                return int(f.read().strip()) / 1000.0
+        except (OSError, ValueError):
+            pass
+
+        try:
+            import psutil
+
+            freq = psutil.cpu_freq()
+            if freq and freq.current:
+                return float(freq.current)
+        except Exception:
+            pass
+        return None
 
     @staticmethod
     def voltagem_cpu():
-        """Lê voltagem da CPU via vcgencmd"""
-        try:
-            result = subprocess.run(["vcgencmd", "measure_volts", "core"], capture_output=True, text=True, timeout=2)
-            return result.stdout.strip()
-        except:
+        """Lê voltagem da CPU via vcgencmd (exclusivo do Raspberry Pi)"""
+        if not platform_support.LINUX:
             return None
+        result = _run(["vcgencmd", "measure_volts", "core"], timeout=2)
+        return result.stdout.strip() if result is not None else None
 
     @staticmethod
     def throttled_status():
-        """Verifica status de throttling (vcgencmd get_throttled)"""
-        try:
-            result = subprocess.run(["vcgencmd", "get_throttled"], capture_output=True, text=True, timeout=2)
-            return result.stdout.strip()
-        except:
+        """Verifica status de throttling (vcgencmd, exclusivo do Raspberry Pi)"""
+        if not platform_support.LINUX:
             return None
+        result = _run(["vcgencmd", "get_throttled"], timeout=2)
+        return result.stdout.strip() if result is not None else None

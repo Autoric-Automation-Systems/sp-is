@@ -120,6 +120,7 @@ class App(ctk.CTk):
         self.page_host.grid_rowconfigure(0, weight=1)
         self.page_host.grid_columnconfigure(0, weight=1)
 
+        self.header.refresh_recipe()
         self.refresh_header_stats()
 
     # ------------------------------------------------------------------ receita ativa
@@ -135,6 +136,8 @@ class App(ctk.CTk):
         self.current_recipe = recipe
         self.config["active_recipe"] = recipe["name"] if recipe else None
         save_config(self.config)
+        self.header.refresh_recipe()
+        self.refresh_header_stats()
 
     def reload_active_recipe(self):
         self.config = load_config()
@@ -143,6 +146,8 @@ class App(ctk.CTk):
         if self.config.get("active_recipe") != name:
             self.config["active_recipe"] = name
             save_config(self.config)
+        self.header.refresh_recipe()
+        self.refresh_header_stats()
 
     def set_active_recipe_name(self, name):
         self.config["active_recipe"] = name
@@ -182,6 +187,7 @@ class App(ctk.CTk):
 
         page.tkraise()
         self.sidebar.set_active(route)
+        self.refresh_header_recipe()
         try:
             page.on_show()
         except Exception:
@@ -237,6 +243,13 @@ class App(ctk.CTk):
             self.header.update_stats(self.history.stats())
         except Exception:
             LOGGER.exception("Falha ao atualizar o resumo do header")
+
+    def refresh_header_recipe(self):
+        """Atualiza a receita em uso exibida no header."""
+        try:
+            self.header.refresh_recipe()
+        except Exception:
+            LOGGER.exception("Falha ao atualizar a receita do header")
 
     def notify_history_cleared(self):
         page = self.current_page

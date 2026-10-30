@@ -1,12 +1,26 @@
-"""Módulo de verificação de câmera no Raspberry Pi - APENAS subprocessos, sem OpenCV"""
+"""Verificação de câmera CSI via libcamera/raspistill (exclusiva do Raspberry Pi).
+
+Em Windows/macOS nada é executado: `supported()` retorna False e a tela de
+diagnóstico mostra a câmera em uso a partir das Configurações.
+"""
 import subprocess
+
+import platform_support
 
 
 class CameraChecker:
     @staticmethod
+    def supported():
+        """True apenas quando libcamera/raspistill existem (Raspberry Pi)."""
+        return platform_support.csi_camera_supported()
+
+    @staticmethod
     def check():
         """Verifica câmera por libcamera e raspistill apenas"""
         resultados = {}
+
+        if not CameraChecker.supported():
+            return resultados
 
         # libcamera (Bullseye+)
         try:

@@ -3,6 +3,7 @@ import tkinter as tk
 from components import ui
 from styles.theme import *
 from processes.gpio_checker import GpioChecker
+import platform_support
 from .base_tab import BaseTab
 
 # Layout do conector J8 (GPIO 40 pinos) do RPi 4
@@ -71,6 +72,15 @@ class GpioTab(BaseTab):
                         font=FONT_TITLE, fg=PRIMARY, bg=CARD)
         title.pack(anchor="w", padx=16, pady=(16,8))
 
+        if not platform_support.io_hardware_supported():
+            ui.label(
+                sf,
+                "GPIO físico disponível apenas no Raspberry Pi. "
+                f"Plataforma atual: {platform_support.system_label()}.",
+                kind="small",
+                bg=CARD,
+            ).pack(anchor="w", padx=16, pady=(0, 8))
+
         # Frame para os pinos
         pins_frame = ui.frame(sf, "card")
         pins_frame.pack(fill="both", expand=True, padx=16, pady=8)
@@ -132,7 +142,7 @@ class GpioTab(BaseTab):
         
         tk.Label(leg_frame, text="Modo: ", font=FONT_BOLD, fg=TEXT_DIM, bg=CARD).pack(side="left")
         for mode, color in [("ip", "#4CAF50"), ("op", "#2196F3"), ("a0-a5", "#FF9800"), ("PWR/GND", "#6B7280")]:
-            tk.Label(leg_frame, text="■", fg=color, bg=CARD, font=("Segoe UI",10)).pack(side="left", padx=(8,2))
+            tk.Label(leg_frame, text="■", fg=color, bg=CARD, font=FONT_SMALL).pack(side="left", padx=(8,2))
             tk.Label(leg_frame, text=mode, font=FONT_SMALL, fg=TEXT_DIM, bg=CARD).pack(side="left", padx=(0,6))
 
     def _create_pin_widgets(self, parent, pino_fisico, bcm):

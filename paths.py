@@ -8,6 +8,7 @@ CONFIG_PATH = DATA_DIR / "config.json"
 RECIPES_DIR = DATA_DIR / "recipes"
 IMAGES_DIR = DATA_DIR / "images"
 DB_PATH = DATA_DIR / "sp_is.db"
+SIMULATION_DIR = DATA_DIR / "simulation"
 
 
 def resolve_project_path(value) -> Path:

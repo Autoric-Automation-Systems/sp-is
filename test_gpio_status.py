@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test script to check GPIO status display"""
+"""Teste manual da detecção de GPIO (executar no Raspberry Pi)."""
 from processes.gpio_checker import GpioChecker
 
 print("=== Testando GPIO Status ===\n")

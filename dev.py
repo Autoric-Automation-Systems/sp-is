@@ -7,6 +7,8 @@ import time
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
+import paths
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -18,7 +20,10 @@ class RestartHandler(FileSystemEventHandler):
     def start(self):
         self.stop()
         LOGGER.info("Iniciando app...")
-        self.process = subprocess.Popen([sys.executable, "app.py"])
+        self.process = subprocess.Popen(
+            [sys.executable, str(paths.BASE_DIR / "app.py")],
+            cwd=str(paths.BASE_DIR),
+        )
 
     def stop(self):
         if self.process and self.process.poll() is None:
@@ -42,7 +47,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     event_handler = RestartHandler()
     observer = Observer()
-    observer.schedule(event_handler, ".", recursive=True)
+    observer.schedule(event_handler, str(paths.BASE_DIR), recursive=True)
     observer.start()
 
     try:

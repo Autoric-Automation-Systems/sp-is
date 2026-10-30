@@ -10,9 +10,8 @@ from paths import CONFIG_PATH, DATA_DIR
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_CONFIG = {
-    # Inspeção
-    "threshold": 300,       # pixels de borda a partir dos quais a tampa é considerada ausente
-    "min_brightness": 50,   # brilho médio mínimo para considerar que há uma garrafa
+    # Inspeção: o critério de aprovação fica em cada ROI da receita
+    # (nome, retângulo e janela de % de acerto contra a imagem de referência).
     "active_recipe": None,  # nome da receita em uso
     # Hardware
     "camera_source": "auto",              # auto | picamera | opencv:<idx> | synthetic
@@ -32,6 +31,9 @@ DEFAULT_CONFIG = {
     },
 }
 
+# Chaves removidas: a avaliação passou a ser por ROI (janela de % da receita).
+LEGACY_KEYS = ("threshold", "min_brightness")
+
 def _deep_merge(defaults, saved):
     """Mescla dicts preservando defaults para chaves ausentes."""
     result = copy.deepcopy(defaults)
@@ -45,13 +47,6 @@ def _deep_merge(defaults, saved):
     return result
 
 
-def _as_float(value, default):
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return float(default)
-
-
 def _as_int(value, default):
     try:
         return int(value)
@@ -60,10 +55,8 @@ def _as_int(value, default):
 
 
 def _normalize(config):
-    config["threshold"] = _as_float(config.get("threshold"), DEFAULT_CONFIG["threshold"])
-    config["min_brightness"] = _as_float(
-        config.get("min_brightness"), DEFAULT_CONFIG["min_brightness"]
-    )
+    for key in LEGACY_KEYS:
+        config.pop(key, None)
 
     active = config.get("active_recipe")
     config["active_recipe"] = active if isinstance(active, str) and active.strip() else None

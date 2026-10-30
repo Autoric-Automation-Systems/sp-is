@@ -1,7 +1,8 @@
 """Entradas e saídas digitais.
 
-No Raspberry Pi usa gpiozero (preferencial) ou RPi.GPIO. Sem GPIO disponível,
-o serviço funciona em modo simulado, permitindo testar a interface no PC.
+No Raspberry Pi usa gpiozero (preferencial) ou RPi.GPIO. Em Windows, macOS ou
+em um Linux sem GPIO, o serviço funciona em modo simulado, permitindo testar a
+interface no PC sem alterar nenhuma outra tela.
 
 Mapa de I/O (BCM):
 - presence_pin: sensor de presença de peça
@@ -13,6 +14,7 @@ Mapa de I/O (BCM):
 import logging
 import threading
 
+import platform_support
 from services.config_service import load_config
 
 LOGGER = logging.getLogger(__name__)
@@ -145,6 +147,13 @@ def _create_backend(config):
     duplicates = {pin for pin in pins if pins.count(pin) > 1}
     if duplicates:
         LOGGER.warning("Pinos GPIO duplicados na configuração: %s", sorted(duplicates))
+
+    if not platform_support.io_hardware_supported():
+        LOGGER.info(
+            "I/O em modo simulado (%s não expõe GPIO físico)",
+            platform_support.system_label(),
+        )
+        return _SimulatedBackend(inputs, outputs)
 
     for factory in (
         lambda: _GpioZeroBackend(inputs, outputs, active_high),

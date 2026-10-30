@@ -6,7 +6,13 @@ import tkinter as tk
 from tkinter import messagebox
 
 from components import ui
-from components.camera_view import current_backend_name, list_available_cameras, restart_camera
+from components.camera_view import (
+    current_backend_name,
+    list_available_cameras,
+    restart_camera,
+    simulation_directory,
+)
+from paths import to_project_relative
 from services.config_service import load_config, save_config
 from services.io_service import AVAILABLE_BCM_PINS, get_io, restart_io
 from styles.theme import *
@@ -106,6 +112,14 @@ class SettingsPage(Page):
 
         self.camera_status = ui.label(panel.content, "", kind="small")
         self.camera_status.pack(anchor="w", pady=(8, 0))
+
+        ui.label(
+            panel.content,
+            "Modo simulado: usa as imagens de "
+            f"{to_project_relative(simulation_directory())} "
+            "(salvas nessa pasta); sem imagens, desenha a cena de teste.",
+            kind="small",
+        ).pack(anchor="w", pady=(4, 0))
 
         self.refresh_cameras()
 
@@ -281,7 +295,10 @@ class SettingsPage(Page):
         ).pack(anchor="w", pady=(8, 0))
 
         try:
-            backend = get_io().backend_name
+            io_service = get_io()
+            backend = io_service.backend_name
+            if io_service.simulated:
+                backend += " — simulado (os pinos BCM só têm efeito no Raspberry Pi)"
         except Exception as exc:
             backend = f"indisponível ({exc})"
         ui.label(panel.content, f"Backend de I/O em uso: {backend}", kind="small").pack(

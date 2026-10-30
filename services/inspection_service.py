@@ -40,15 +40,15 @@ class InspectionHistory:
             return None
 
     def add_result(self, result):
+        details = result.get("details") or result.get("rois") or []
         record = InspectionRecord(
             timestamp=result.get("timestamp") or datetime.now(),
             recipe=result.get("recipe") or "-",
             result=result.get("result", "-"),
             ok=bool(result.get("ok")),
-            score=int(result.get("score") or 0),
-            threshold=float(result.get("threshold") or 0),
-            brightness=float(result.get("brightness") or 0),
+            match=float(result.get("match") or result.get("score") or 0.0),
             elapsed_ms=int(result.get("elapsed_ms") or 0),
+            details=[dict(item) for item in details],
             frame_jpeg=self._encode_frame(result.get("frame")),
         )
         self.repository.save(record)
